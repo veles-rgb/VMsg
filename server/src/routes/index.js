@@ -1,5 +1,6 @@
-const express = require('express');
-const router = express.Router();
+const router = require("express").Router();
+const { requireAuth } = require("../middleware/requireAuth");
+const authRouter = require('./auth.js');
 
 router.get('/health', async (req, res) => {
     const healthcheck = {
@@ -15,5 +16,7 @@ router.get('/health', async (req, res) => {
         res.status(503).json(healthcheck);
     }
 });
+
+router.use('/auth', authRouter);
 
 module.exports = router;
