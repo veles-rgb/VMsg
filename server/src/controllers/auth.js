@@ -3,31 +3,36 @@ const jwt = require("jsonwebtoken");
 
 const { prisma } = require('../../lib/prisma.mjs');
 
-function signAccessToken(user) {
-    return jwt.sign(
-        {
-            sub: user.id,
-            username: user.username,
-        },
-        process.env.ACCESS_TOKEN_SECRET,
-        { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m" }
-    );
-}
-
 async function createUser(req, res, next) {
     try {
-        const hashedPassword = await bcrypt.hash(req.body.password, 10);
+        const { username, displayName, password } = req.body;
+
+        if (!username || !displayName || !password) {
+            return res.status(400).json({ error: "username, displayName, and password are required" });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = await prisma.user.create({
             data: {
-                username: req.body.username,
-                displayName: req.body.displayName,
-                hashedPassword
+                username,
+                displayName,
+                hashedPassword,
             },
-            select: { id: true, username: true, displayName: true, createdAt: true }
+            select: { id: true, username: true, displayName: true, createdAt: true },
         });
 
-        return res.status(201).json({ user });
+        const accessToken = jwt.sign(
+            {
+                sub: user.id,
+                username: user.username,
+                displayName: user.displayName,
+            },
+            process.env.ACCESS_TOKEN_SECRET,
+            { expiresIn: "1h" }
+        );
+
+        return res.status(201).json({ accessToken, user });
     } catch (err) {
         if (err.code === "P2002") {
             return res.status(409).json({ error: "Username already taken" });
@@ -55,7 +60,15 @@ async function loginUser(req, res, next) {
 
         if (!ok) return res.status(401).json({ error: "Invalid credentials" });
 
-        const token = signAccessToken(user);
+        const token = jwt.sign(
+            {
+                sub: user.id,
+                username: user.username,
+                displayName: user.displayName
+            },
+            process.env.ACCESS_TOKEN_SECRET,
+            { expiresIn: "1h" }
+        );
 
         return res.json({
             accessToken: token,
