@@ -12,6 +12,7 @@ function requireAuth(req, res, next) {
         req.user = {
             id: payload.sub,
             username: payload.username,
+            displayName: payload.displayName
         };
 
         return next();
