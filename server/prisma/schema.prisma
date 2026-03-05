@@ -7,13 +7,64 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ChatType {
+  DM
+  GROUP
+}
+
 model User {
-  id  String @id @default(uuid()) @db.Uuid
-  username String @unique @db.VarChar(25)
-  displayName String @db.VarChar(25)
-
+  id             String   @id @default(uuid()) @db.Uuid
+  username       String   @unique @db.VarChar(25)
+  displayName    String   @db.VarChar(25)
   hashedPassword String
+  lastSeenAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  chatParticipants ChatParticipant[]
+  sentMessages     Message[]
+
+  createdChats Chat[] @relation("ChatCreatedBy")
+}
+
+model Chat {
+  id              String    @id @default(uuid()) @db.Uuid
+  type            ChatType
+  title           String?
+  createdByUserId String?   @db.Uuid
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastMessageAt   DateTime?
+
+  createdBy   User?             @relation("ChatCreatedBy", fields: [createdByUserId], references: [id])
+  participants ChatParticipant[]
+  messages     Message[]
+
+  @@index([lastMessageAt])
+}
+
+model ChatParticipant {
+  chatId   String   @db.Uuid
+  userId   String   @db.Uuid
+  joinedAt DateTime @default(now())
+  leftAt   DateTime?
+
+  chat Chat @relation(fields: [chatId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+
+  @@id([chatId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id           String   @id @default(uuid()) @db.Uuid
+  chatId       String   @db.Uuid
+  senderUserId String   @db.Uuid
+  content      String
+  sentAt       DateTime @default(now())
+
+  chat   Chat @relation(fields: [chatId], references: [id])
+  sender User @relation(fields: [senderUserId], references: [id])
+
+  @@index([chatId, sentAt])
 }
