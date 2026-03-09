@@ -8,9 +8,26 @@ import Welcome from './pages/Welcome.jsx';
 import Home from './pages/Home.jsx';
 import Register from './pages/Register.jsx';
 import Login from './pages/Login.jsx';
+import { useEffect } from 'react';
 
 function App() {
-  const { user } = useAuth();
+  const apiUrl = import.meta.env.VITE_API_URL;
+  const { user, token } = useAuth();
+
+  useEffect(() => {
+    if (!token) return;
+
+    const interval = setInterval(() => {
+      fetch(`${apiUrl}/user/heartbeat`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [apiUrl, token]);
+
   return (
     <>
       <Header />
