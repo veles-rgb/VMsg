@@ -58,3 +58,9 @@ form label {
     display: flex;
     flex-direction: column;
 }
+
+.contains-icon {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+}
