@@ -3,6 +3,7 @@ import { useAuth } from './auth/AuthContext';
 import './App.css';
 
 // Pages
+import Header from './components/Header.jsx';
 import Welcome from './pages/Welcome.jsx';
 import Home from './pages/Home.jsx';
 import Register from './pages/Register.jsx';
@@ -12,6 +13,7 @@ function App() {
   const { user } = useAuth();
   return (
     <>
+      <Header />
       <Routes>
         {!user && (
           <>
