@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 
 const AuthContext = createContext(null);
 
@@ -12,26 +12,28 @@ export function AuthProvider({ children }) {
     return localStorage.getItem('accessToken');
   });
 
-  function login(data) {
+  const apiUrl = import.meta.env.VITE_API_URL;
+
+  const login = useCallback((data) => {
     setUser(data.user);
     setToken(data.accessToken);
 
     localStorage.setItem('user', JSON.stringify(data.user));
     localStorage.setItem('accessToken', data.accessToken);
-  }
+  }, []);
 
-  function logout() {
+  const logout = useCallback(() => {
     setUser(null);
     setToken(null);
 
     localStorage.removeItem('user');
     localStorage.removeItem('accessToken');
-  }
+  }, []);
 
-  async function verify() {
+  const verify = useCallback(async () => {
     if (!token) return false;
 
-    const res = await fetch('/api/auth/verify', {
+    const res = await fetch(`${apiUrl}/auth/verify`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -46,7 +48,7 @@ export function AuthProvider({ children }) {
     setUser(data.user);
 
     return true;
-  }
+  }, [token, apiUrl, logout]);
 
   return (
     <AuthContext.Provider value={{ user, token, login, logout, verify }}>
