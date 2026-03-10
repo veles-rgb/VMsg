@@ -4,6 +4,7 @@ const { requireAuth } = require("../middleware/requireAuth");
 // Routers
 const authRouter = require('./auth.js');
 const userRouter = require('./user.js');
+const chatRouter = require('./chat.js');
 
 router.get('/health', async (req, res) => {
     const healthcheck = {
@@ -22,5 +23,6 @@ router.get('/health', async (req, res) => {
 
 router.use('/auth', authRouter);
 router.use('/user', requireAuth, userRouter);
+router.use('/chat', requireAuth, chatRouter);
 
 module.exports = router;
