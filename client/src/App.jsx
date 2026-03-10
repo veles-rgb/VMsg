@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import './App.css';
@@ -8,25 +9,52 @@ import Welcome from './pages/Welcome.jsx';
 import Home from './pages/Home.jsx';
 import Register from './pages/Register.jsx';
 import Login from './pages/Login.jsx';
-import { useEffect } from 'react';
+import Chat from './pages/Chat.jsx';
 
 function App() {
   const apiUrl = import.meta.env.VITE_API_URL;
-  const { user, token } = useAuth();
+  const { user, token, logout, verify, authLoading } = useAuth();
+
+  useEffect(() => {
+    async function checkAuth() {
+      if (!token) return;
+
+      const ok = await verify();
+
+      if (!ok) {
+        logout();
+      }
+    }
+
+    checkAuth();
+  }, [token, logout, verify]);
 
   useEffect(() => {
     if (!token) return;
 
-    const interval = setInterval(() => {
-      fetch(`${apiUrl}/user/heartbeat`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    }, 6000);
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${apiUrl}/user/heartbeat`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (res.status === 401) {
+          logout();
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, 10000);
+
     return () => clearInterval(interval);
-  }, [apiUrl, token]);
+  }, [apiUrl, token, logout]);
+
+  if (authLoading) {
+    return <p>Loading...</p>;
+  }
 
   return (
     <>
@@ -43,6 +71,7 @@ function App() {
         {user && (
           <>
             <Route path="/" element={<Home />} />
+            <Route path="/chat/:chatId" element={<Chat />} />
           </>
         )}
 
