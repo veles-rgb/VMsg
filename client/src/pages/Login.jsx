@@ -29,7 +29,7 @@ export default function Login() {
       });
 
       if (!res.ok) {
-        const data = res.json().catch(() => null);
+        const data = await res.json().catch(() => null);
         throw new Error(data?.message || `Something went wrong ${res.status}`);
       }
 
