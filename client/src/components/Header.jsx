@@ -11,7 +11,9 @@ export default function Header() {
     <header>
       {user ? (
         <>
-          <h1 className={styles.title}>VMsg</h1>
+          <a href="/">
+            <h1 className={styles.title}>VMsg</h1>
+          </a>
           <div className={styles.categories}>
             <div className={styles.chats}>
               <h2>Chats</h2>
