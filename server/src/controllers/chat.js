@@ -276,6 +276,53 @@ async function sendChatMsg(req, res, next) {
     }
 }
 
+async function renameChat(req, res, next) {
+    try {
+        const { chatId } = req.params;
+        const userId = req.user.id;
+        const { newTitle } = req.body;
+
+        const chat = await prisma.chat.findFirst({
+            where: {
+                id: chatId,
+                participants: {
+                    some: {
+                        userId: userId,
+                        leftAt: null,
+                    },
+                },
+            },
+        });
+
+        if (!chat) {
+            return res.status(404).json({ message: "Chat not found" });
+        }
+
+        await prisma.chat.update({
+            where: {
+                id: chatId,
+                participants: {
+                    some: {
+                        userId: userId,
+                        leftAt: null,
+                    },
+                },
+            },
+            data: {
+                title: newTitle
+            }
+        });
+
+        return res.status(200).json({ message: 'Chat title updated' });
+    } catch (err) {
+        return next(err);
+    }
+}
+
+async function leaveChat(params) {
+
+}
+
 module.exports = {
     createDm,
     createGroup,
@@ -283,4 +330,5 @@ module.exports = {
     getChatById,
     getChatMessages,
     sendChatMsg,
+    renameChat,
 };
