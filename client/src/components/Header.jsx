@@ -95,7 +95,7 @@ export default function Header() {
                       type="button"
                     >
                       <FaComments />
-                      <span>{getChatName(chat)}</span>
+                      <span>{chat?.title || getChatName(chat)}</span>
                     </button>
                   );
                 })
