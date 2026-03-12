@@ -32,10 +32,16 @@
     --color-danger: #ef4444;
 }
 
+html,
+body {
+    height: 100%;
+    margin: 0;
+}
+
 #root {
     height: 100vh;
     display: grid;
-    grid-template-columns: 1fr 5fr;
+    grid-template-columns: 260px 1fr;
 }
 
 header {
