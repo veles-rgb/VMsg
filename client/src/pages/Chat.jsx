@@ -6,6 +6,16 @@ import { formatDate } from '../utils/formatDate';
 
 import styles from './styles/Chat.module.css';
 
+import {
+  FaGear,
+  FaPlus,
+  FaCircleArrowUp,
+  FaHourglassEnd,
+  FaArrowRightFromBracket,
+} from 'react-icons/fa6';
+
+import { FaEdit, FaRegWindowClose } from 'react-icons/fa';
+
 export default function Chat() {
   const { chatId } = useParams();
   const textareaRef = useRef(null);
@@ -14,6 +24,7 @@ export default function Chat() {
   const [chat, setChat] = useState(null);
   const [otherParticipants, setOtherParticipants] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [chatTitle, setChatTitle] = useState();
 
   const [loadingChat, setLoadingChat] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(true);
@@ -22,6 +33,13 @@ export default function Chat() {
   const [chatError, setChatError] = useState('');
   const [messageError, setMessageError] = useState('');
   const [message, setMessage] = useState('');
+
+  const [showSettings, setShowSettings] = useState(false);
+
+  const [showTitleForm, setShowTitleForm] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newTitleLoading, setNewTitleLoading] = useState(false);
+  const [newTitleError, setNewTitleError] = useState('');
 
   const { token, user } = useAuth();
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -57,6 +75,7 @@ export default function Chat() {
 
         setOtherParticipants(data.otherParticipants || []);
         setChat(data.chat);
+        setChatTitle(data.chat.title);
       } catch (err) {
         setChatError(err.message || 'Something went wrong');
       } finally {
@@ -143,6 +162,63 @@ export default function Chat() {
     }
   }
 
+  // Settings handler
+  function handleSettingsClick() {
+    setShowSettings((prev) => !prev);
+  }
+
+  // Rename chat handlers
+  async function handleRenameChat() {
+    setShowTitleForm((prev) => !prev);
+  }
+
+  async function handleTitleFormSubmit(e) {
+    e.preventDefault();
+    if (!newTitle.trim() || newTitleLoading) return;
+
+    try {
+      setNewTitleLoading(true);
+      setNewTitleError('');
+
+      const res = await fetch(`${apiUrl}/chat/${chatId}/rename`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+
+        body: JSON.stringify({
+          newTitle,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.error || data?.message || `Something went wrong: ${res.status}`,
+        );
+      }
+
+      setChatTitle(newTitle);
+      setNewTitle('');
+      window.location.reload();
+    } catch (err) {
+      setNewTitleError(err.message || 'Something went wrong');
+    } finally {
+      setNewTitleLoading(false);
+      setShowTitleForm(false);
+      setShowSettings(false);
+    }
+  }
+
+  function handleCloseTitleForm() {
+    setShowTitleForm(false);
+    setShowSettings(false);
+  }
+
+  // Leave chat (group only) handler
+  async function handleLeaveChat() {}
+
   if (loadingChat) {
     return (
       <main className={styles.main}>
@@ -161,11 +237,70 @@ export default function Chat() {
 
   return (
     <main className={styles.main}>
-      <h2 className={styles.chatTitle}>
-        {chat?.type === 'GROUP'
-          ? chat.title || 'Group Chat'
-          : otherParticipants[0]?.user?.displayName || 'Chat'}
-      </h2>
+      <div className={`${styles.mainHeader} contains-icon`}>
+        <h2 className={styles.chatTitle}>
+          {chat?.type === 'GROUP'
+            ? chat.title || 'Group Chat'
+            : chatTitle || otherParticipants[0]?.user?.displayName || 'Chat'}
+        </h2>
+        <div className={styles.settingsWrapper}>
+          <FaGear
+            className={styles.settingsIcon}
+            onClick={handleSettingsClick}
+          />
+
+          {showSettings && (
+            <>
+              <div className={styles.settingsDropdown}>
+                <div
+                  className={`${styles.dropdownItem} contains-icon`}
+                  onClick={handleRenameChat}
+                >
+                  <FaEdit />
+                  Rename Chat
+                </div>
+                {chat?.type === 'GROUP' && (
+                  <div
+                    className={`${styles.dropdownItem} contains-icon`}
+                    onClick={handleLeaveChat}
+                  >
+                    <FaArrowRightFromBracket />
+                    Leave
+                  </div>
+                )}
+              </div>
+
+              {showTitleForm && (
+                <div className={styles.titleFormOverlay}>
+                  <form
+                    className={styles.titleForm}
+                    onSubmit={handleTitleFormSubmit}
+                  >
+                    <FaRegWindowClose
+                      className={styles.titleFormClose}
+                      onClick={handleCloseTitleForm}
+                    />
+                    <label>
+                      New Chat Name
+                      <input
+                        type="text"
+                        name="title"
+                        id="title"
+                        value={newTitle}
+                        onChange={(e) => setNewTitle(e.target.value)}
+                      />
+                    </label>
+                    <button type="submit">Update</button>
+
+                    {newTitleError && <p>{newTitleError}</p>}
+                  </form>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
       <div className={styles.chatContainer}>
         <div className={styles.chat} ref={chatRef}>
           <div className={styles.messagesInner}>
@@ -222,7 +357,7 @@ export default function Chat() {
         >
           <div className={styles.inputBar}>
             <button className={styles.attachmentBtn} type="button">
-              +
+              <FaPlus />
             </button>
 
             <textarea
@@ -253,7 +388,7 @@ export default function Chat() {
               type="submit"
               disabled={sendingMessage}
             >
-              {sendingMessage ? '...' : 'Send'}
+              {sendingMessage ? <FaHourglassEnd /> : <FaCircleArrowUp />}
             </button>
           </div>
         </form>
