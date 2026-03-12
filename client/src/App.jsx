@@ -10,6 +10,7 @@ import Home from './pages/Home.jsx';
 import Register from './pages/Register.jsx';
 import Login from './pages/Login.jsx';
 import Chat from './pages/Chat.jsx';
+import CreateChat from './pages/CreateChat.jsx';
 
 function App() {
   const apiUrl = import.meta.env.VITE_API_URL;
@@ -72,6 +73,7 @@ function App() {
           <>
             <Route path="/" element={<Home />} />
             <Route path="/chat/:chatId" element={<Chat />} />
+            <Route path="/chat/new/:type" element={<CreateChat />} />
           </>
         )}
 
