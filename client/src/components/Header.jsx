@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import styles from './styles/Header.module.css';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
@@ -9,12 +9,30 @@ export default function Header() {
   const { user, logout, token } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const optionsRef = useRef(null);
 
   const apiUrl = import.meta.env.VITE_API_URL;
 
   const [chats, setChats] = useState([]);
   const [loadingChats, setLoadingChats] = useState(false);
   const [chatError, setChatError] = useState('');
+
+  // Create chat options
+  const [showOptions, setShowOptions] = useState(false);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (optionsRef.current && !optionsRef.current.contains(e.target)) {
+        setShowOptions(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     if (!user || !token) return;
@@ -60,6 +78,18 @@ export default function Header() {
     console.log('Card clicked');
   }
 
+  function handleOptionsCLick() {
+    setShowOptions((prev) => !prev);
+  }
+
+  function handleStartChat() {
+    navigate('/chat/new/dm');
+  }
+
+  function handleCreateGroup() {
+    navigate('/chat/new/group');
+  }
+
   return (
     <header className={styles.sidebar}>
       {user ? (
@@ -69,11 +99,28 @@ export default function Header() {
               <h1 className={styles.title}>VMsg</h1>
             </Link>
 
-            <div className={styles.sectionHeader}>
+            <div ref={optionsRef} className={styles.sectionHeader}>
               <h2 className={styles.sectionTitle}>Chats</h2>
-              <div>
+              <div className={styles.optionsIcon} onClick={handleOptionsCLick}>
                 <FaPlus />
               </div>
+
+              {showOptions && (
+                <div className={styles.optionsMenu}>
+                  <div
+                    className={styles.optionMenuItem}
+                    onClick={handleStartChat}
+                  >
+                    Start Chat
+                  </div>
+                  <div
+                    className={styles.optionMenuItem}
+                    onClick={handleCreateGroup}
+                  >
+                    Create Group
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className={styles.chatsContainer}>
