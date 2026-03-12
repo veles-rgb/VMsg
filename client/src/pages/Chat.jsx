@@ -20,6 +20,7 @@ export default function Chat() {
   const { chatId } = useParams();
   const textareaRef = useRef(null);
   const chatRef = useRef(null);
+  const settingsRef = useRef(null);
 
   const [chat, setChat] = useState(null);
   const [otherParticipants, setOtherParticipants] = useState([]);
@@ -48,6 +49,20 @@ export default function Chat() {
     if (!chatRef.current) return;
     chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setShowSettings(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   useEffect(() => {
     async function fetchChat() {
@@ -243,7 +258,7 @@ export default function Chat() {
             ? chat.title || 'Group Chat'
             : chatTitle || otherParticipants[0]?.user?.displayName || 'Chat'}
         </h2>
-        <div className={styles.settingsWrapper}>
+        <div ref={settingsRef} className={styles.settingsWrapper}>
           <FaGear
             className={styles.settingsIcon}
             onClick={handleSettingsClick}
