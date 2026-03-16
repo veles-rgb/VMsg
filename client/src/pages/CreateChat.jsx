@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 
+import styles from './styles/CreateChat.module.css';
+
 export default function CreateChat() {
   const { type } = useParams();
   const navigate = useNavigate();
@@ -152,58 +154,16 @@ export default function CreateChat() {
   }
 
   return (
-    <main>
-      {type === 'dm' && (
-        <div>
-          <h2>Create DM</h2>
+    <main className={styles.main}>
+      <div className={styles.container}>
+        {type === 'dm' && (
+          <div className={styles.card}>
+            <h2 className={styles.title}>Create DM</h2>
 
-          <label>
-            Search users
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by username or display name"
-            />
-          </label>
-
-          {searchLoading && <p>Searching...</p>}
-          {searchErrors && <p>{searchErrors}</p>}
-          {createError && <p>{createError}</p>}
-
-          <div>
-            {searchResults.map((user) => (
-              <button
-                key={user.id}
-                type="button"
-                onClick={() => handleCreateDm(user)}
-                disabled={createLoading}
-              >
-                {user.displayName} @{user.username}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {type === 'group' && (
-        <div>
-          <h2>Create Group</h2>
-
-          <form onSubmit={handleCreateGroup}>
-            <label>
-              Group title
-              <input
-                type="text"
-                value={groupTitle}
-                onChange={(e) => setGroupTitle(e.target.value)}
-                placeholder="Enter group name"
-              />
-            </label>
-
-            <label>
+            <label className={styles.label}>
               Search users
               <input
+                className={styles.input}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -211,50 +171,129 @@ export default function CreateChat() {
               />
             </label>
 
-            {searchLoading && <p>Searching...</p>}
-            {searchErrors && <p>{searchErrors}</p>}
-            {createError && <p>{createError}</p>}
+            {searchLoading && <p className={styles.status}>Searching...</p>}
 
-            {selectedUsers.length > 0 && (
-              <div>
-                <h3>Selected Users</h3>
-                <div>
-                  {selectedUsers.map((user) => (
+            {searchErrors && <p className={styles.error}>{searchErrors}</p>}
+
+            {createError && <p className={styles.error}>{createError}</p>}
+
+            <div className={styles.results}>
+              {searchResults.map((user) => (
+                <button
+                  key={user.id}
+                  type="button"
+                  className={styles.userButton}
+                  onClick={() => handleCreateDm(user)}
+                  disabled={createLoading}
+                >
+                  <div className={styles.userRow}>
+                    <div className={styles.userMeta}>
+                      <span className={styles.displayName}>
+                        {user.displayName}
+                      </span>
+                      <span className={styles.username}>@{user.username}</span>
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {type === 'group' && (
+          <div className={styles.card}>
+            <h2 className={styles.title}>Create Group</h2>
+
+            <form className={styles.form} onSubmit={handleCreateGroup}>
+              <label className={styles.label}>
+                Group title
+                <input
+                  className={styles.input}
+                  type="text"
+                  value={groupTitle}
+                  onChange={(e) => setGroupTitle(e.target.value)}
+                  placeholder="Enter group name"
+                />
+              </label>
+
+              <label className={styles.label}>
+                Search users
+                <input
+                  className={styles.input}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by username or display name"
+                />
+              </label>
+
+              {searchLoading && <p className={styles.status}>Searching...</p>}
+
+              {searchErrors && <p className={styles.error}>{searchErrors}</p>}
+
+              {createError && <p className={styles.error}>{createError}</p>}
+
+              {selectedUsers.length > 0 && (
+                <div className={styles.selectedSection}>
+                  <h3 className={styles.selectedTitle}>Selected Users</h3>
+
+                  <div className={styles.selectedUsers}>
+                    {selectedUsers.map((user) => (
+                      <button
+                        key={user.id}
+                        type="button"
+                        className={styles.selectedChip}
+                        onClick={() => toggleSelectedUser(user)}
+                      >
+                        {user.displayName} ✕
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className={styles.results}>
+                {searchResults.map((user) => {
+                  const isSelected = selectedUsers.some(
+                    (u) => u.id === user.id,
+                  );
+
+                  return (
                     <button
                       key={user.id}
                       type="button"
+                      className={styles.userButton}
                       onClick={() => toggleSelectedUser(user)}
                     >
-                      {user.displayName} ✕
+                      <div className={styles.userRow}>
+                        <div className={styles.userMeta}>
+                          <span className={styles.displayName}>
+                            {isSelected ? '✓ ' : ''}
+                            {user.displayName}
+                          </span>
+                          <span className={styles.username}>
+                            @{user.username}
+                          </span>
+                        </div>
+                      </div>
                     </button>
-                  ))}
-                </div>
+                  );
+                })}
               </div>
-            )}
 
-            <div>
-              {searchResults.map((user) => {
-                const isSelected = selectedUsers.some((u) => u.id === user.id);
-
-                return (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => toggleSelectedUser(user)}
-                  >
-                    {isSelected ? '✓ ' : ''}
-                    {user.displayName} @{user.username}
-                  </button>
-                );
-              })}
-            </div>
-
-            <button type="submit" disabled={createLoading}>
-              {createLoading ? 'Creating...' : 'Create Group'}
-            </button>
-          </form>
-        </div>
-      )}
+              <div className={styles.actions}>
+                <button
+                  className={styles.primaryButton}
+                  type="submit"
+                  disabled={createLoading}
+                >
+                  {createLoading ? 'Creating...' : 'Create Group'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+      </div>
     </main>
   );
 }
