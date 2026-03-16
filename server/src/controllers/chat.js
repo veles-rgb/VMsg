@@ -72,7 +72,66 @@ async function createDm(req, res, next) {
 }
 
 async function createGroup(req, res, next) {
+    try {
+        const createdByUserId = req.user.id;
+        const { title, participants } = req.body;
 
+        if (!title || !title.trim()) {
+            return res.status(400).json({ error: 'Group title is required' });
+        }
+
+        if (!Array.isArray(participants) || participants.length === 0) {
+            return res.status(400).json({ error: 'At least one participant is required' });
+        }
+
+        const uniqueParticipantIds = [...new Set(participants)].filter(
+            (id) => id && id !== createdByUserId
+        );
+
+        if (uniqueParticipantIds.length === 0) {
+            return res.status(400).json({ error: 'At least one other user must be selected' });
+        }
+
+        const validUsers = await prisma.user.findMany({
+            where: {
+                id: {
+                    in: uniqueParticipantIds,
+                },
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (validUsers.length !== uniqueParticipantIds.length) {
+            return res.status(400).json({ error: 'One or more selected users do not exist' });
+        }
+
+        const chat = await prisma.chat.create({
+            data: {
+                type: 'GROUP',
+                title: title.trim(),
+                createdByUserId,
+            },
+        });
+
+        await prisma.chatParticipant.createMany({
+            data: [
+                {
+                    chatId: chat.id,
+                    userId: createdByUserId,
+                },
+                ...uniqueParticipantIds.map((userId) => ({
+                    chatId: chat.id,
+                    userId,
+                })),
+            ],
+        });
+
+        return res.status(201).json({ chatId: chat.id });
+    } catch (err) {
+        return next(err);
+    }
 }
 
 async function getAllChats(req, res, next) {
