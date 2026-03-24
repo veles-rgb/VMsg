@@ -458,8 +458,56 @@ async function addToGroup(req, res, next) {
     }
 }
 
-async function leaveChat(req, res, next) {
+async function leaveGroup(req, res, next) {
+    try {
+        const userId = req.user.id;
+        const { chatId } = req.params;
 
+        if (!chatId) {
+            return res.status(400).json({ error: 'chatId is required' });
+        }
+
+        const participant = await prisma.chatParticipant.findUnique({
+            where: {
+                chatId_userId: {
+                    chatId,
+                    userId,
+                },
+            },
+            select: {
+                leftAt: true,
+                chat: {
+                    select: {
+                        type: true,
+                    },
+                },
+            },
+        });
+
+        if (!participant || participant.chat.type !== 'GROUP') {
+            return res.status(404).json({ error: 'Group chat not found' });
+        }
+
+        if (participant.leftAt) {
+            return res.status(400).json({ error: 'You have already left this group' });
+        }
+
+        await prisma.chatParticipant.update({
+            where: {
+                chatId_userId: {
+                    chatId,
+                    userId,
+                },
+            },
+            data: {
+                leftAt: new Date(),
+            },
+        });
+
+        return res.status(200).json({ ok: true });
+    } catch (err) {
+        return next(err);
+    }
 }
 
 module.exports = {
@@ -471,4 +519,5 @@ module.exports = {
     sendChatMsg,
     renameChat,
     addToGroup,
+    leaveGroup
 };
