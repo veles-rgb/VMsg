@@ -13,7 +13,7 @@ import {
   FaUserPlus,
 } from 'react-icons/fa6';
 
-import { FaEdit, FaRegWindowClose } from 'react-icons/fa';
+import { FaEdit, FaRegWindowClose, FaUsers } from 'react-icons/fa';
 
 export default function Chat() {
   const { chatId } = useParams();
@@ -52,15 +52,21 @@ export default function Chat() {
   const [searchResults, setSearchResults] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
 
+  const [showUsersModal, setShowUsersModal] = useState(false);
+
   const existingUserIds = useMemo(
     () => chat?.participants?.map((p) => p.userId) || [],
     [chat],
   );
 
+  const groupParticipants = useMemo(() => {
+    return chat?.participants || [];
+  }, [chat]);
+
   const chatDisplayTitle =
     chat?.type === 'GROUP'
       ? chat?.title || 'Group Chat'
-      : otherParticipants[0]?.user?.displayName || 'Chat';
+      : chat?.title || otherParticipants[0]?.user?.displayName;
 
   useEffect(() => {
     if (!chatRef.current) return;
@@ -388,7 +394,45 @@ export default function Chat() {
     }
   }
 
-  async function handleLeaveChat() {}
+  function handleOpenUsersModal() {
+    setShowUsersModal(true);
+    setShowSettings(false);
+  }
+
+  function handleCloseUsersModal() {
+    setShowUsersModal(false);
+  }
+
+  async function handleLeaveChat() {
+    if (!chat?.id || chat.type !== 'GROUP') return;
+
+    const confirmed = window.confirm(
+      'Are you sure you want to leave this group chat?',
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch(`${apiUrl}/chat/${chat.id}/leave`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          data?.error || data?.message || 'Failed to leave group',
+        );
+      }
+
+      window.location.href = '/messages';
+    } catch (err) {
+      alert(err.message || 'Something went wrong');
+    }
+  }
 
   if (loadingChat) {
     return (
@@ -567,33 +611,103 @@ export default function Chat() {
 
         <h2 className={styles.chatTitle}>{chatDisplayTitle}</h2>
 
-        <div ref={settingsRef} className={styles.settingsWrapper}>
-          <FaGear
-            className={styles.settingsIcon}
-            onClick={handleSettingsClick}
-          />
+        <div className={styles.topBarRight}>
+          {chat?.type === 'GROUP' && (
+            <FaUsers
+              className={styles.userList}
+              onClick={handleOpenUsersModal}
+            />
+          )}
 
-          {showSettings && (
-            <div className={styles.settingsDropdown}>
+          {showUsersModal && (
+            <div
+              className={styles.userSearchOverlay}
+              onClick={handleCloseUsersModal}
+            >
               <div
-                className={`${styles.dropdownItem} contains-icon`}
-                onClick={handleRenameChat}
+                className={styles.userSearchModal}
+                onClick={(e) => e.stopPropagation()}
               >
-                <FaEdit />
-                Rename Chat
-              </div>
-
-              {chat?.type === 'GROUP' && (
-                <div
-                  className={`${styles.dropdownItem} contains-icon`}
-                  onClick={handleLeaveChat}
-                >
-                  <FaArrowRightFromBracket />
-                  Leave
+                <div className={styles.userSearchHeader}>
+                  <h3 className={styles.userSearchTitle}>Group Members</h3>
+                  <FaRegWindowClose
+                    className={styles.userSearchClose}
+                    onClick={handleCloseUsersModal}
+                  />
                 </div>
-              )}
+
+                <div className={styles.results}>
+                  {groupParticipants.length === 0 ? (
+                    <p className={styles.searchStatus}>No users found.</p>
+                  ) : (
+                    groupParticipants.map((participant) => {
+                      const participantUser = participant.user;
+                      const isMe = participant.userId === user.id;
+
+                      if (!participantUser) return null;
+
+                      return (
+                        <div
+                          key={participant.userId}
+                          className={styles.userButton}
+                        >
+                          <div className={styles.userRow}>
+                            <img
+                              className={styles.userAvatar}
+                              src="https://hwchamber.co.uk/wp-content/uploads/2022/04/avatar-placeholder.gif"
+                              alt={`${participantUser.displayName}'s avatar`}
+                            />
+
+                            <div className={styles.userMeta}>
+                              <span className={styles.displayName}>
+                                {participantUser.displayName}
+                              </span>
+                              <span className={styles.username}>
+                                @{participantUser.username}
+                              </span>
+                            </div>
+
+                            <span className={styles.userStatus}>
+                              {isMe ? 'Me' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             </div>
           )}
+
+          <div ref={settingsRef} className={styles.settingsWrapper}>
+            <FaGear
+              className={styles.settingsIcon}
+              onClick={handleSettingsClick}
+            />
+
+            {showSettings && (
+              <div className={styles.settingsDropdown}>
+                <div
+                  className={`${styles.dropdownItem} contains-icon`}
+                  onClick={handleRenameChat}
+                >
+                  <FaEdit />
+                  Rename Chat
+                </div>
+
+                {chat?.type === 'GROUP' && (
+                  <div
+                    className={`${styles.dropdownItem} contains-icon`}
+                    onClick={handleLeaveChat}
+                  >
+                    <FaArrowRightFromBracket />
+                    Leave
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
