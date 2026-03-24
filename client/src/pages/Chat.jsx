@@ -1,9 +1,7 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useParams } from 'react-router-dom';
-
 import { formatDate } from '../utils/formatDate';
-
 import styles from './styles/Chat.module.css';
 
 import {
@@ -12,12 +10,16 @@ import {
   FaCircleArrowUp,
   FaHourglassEnd,
   FaArrowRightFromBracket,
+  FaUserPlus,
 } from 'react-icons/fa6';
 
 import { FaEdit, FaRegWindowClose } from 'react-icons/fa';
 
 export default function Chat() {
   const { chatId } = useParams();
+  const { token, user } = useAuth();
+  const apiUrl = import.meta.env.VITE_API_URL;
+
   const textareaRef = useRef(null);
   const chatRef = useRef(null);
   const settingsRef = useRef(null);
@@ -25,25 +27,40 @@ export default function Chat() {
   const [chat, setChat] = useState(null);
   const [otherParticipants, setOtherParticipants] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [chatTitle, setChatTitle] = useState();
 
   const [loadingChat, setLoadingChat] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [loadingSearchUser, setLoadingSearchUser] = useState(false);
+  const [newTitleLoading, setNewTitleLoading] = useState(false);
+  const [isAddingUsers, setIsAddingUsers] = useState(false);
 
   const [chatError, setChatError] = useState('');
   const [messageError, setMessageError] = useState('');
+  const [searchErrors, setSearchErrors] = useState('');
+  const [newTitleError, setNewTitleError] = useState('');
+  const [addUsersError, setAddUsersError] = useState('');
+
   const [message, setMessage] = useState('');
+  const [newTitle, setNewTitle] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [showSettings, setShowSettings] = useState(false);
-
   const [showTitleForm, setShowTitleForm] = useState(false);
-  const [newTitle, setNewTitle] = useState('');
-  const [newTitleLoading, setNewTitleLoading] = useState(false);
-  const [newTitleError, setNewTitleError] = useState('');
+  const [showSearchUser, setShowSearchUser] = useState(false);
 
-  const { token, user } = useAuth();
-  const apiUrl = import.meta.env.VITE_API_URL;
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+
+  const existingUserIds = useMemo(
+    () => chat?.participants?.map((p) => p.userId) || [],
+    [chat],
+  );
+
+  const chatDisplayTitle =
+    chat?.type === 'GROUP'
+      ? chat?.title || 'Group Chat'
+      : otherParticipants[0]?.user?.displayName || 'Chat';
 
   useEffect(() => {
     if (!chatRef.current) return;
@@ -71,7 +88,6 @@ export default function Chat() {
         setChatError('');
 
         const res = await fetch(`${apiUrl}/chat/${chatId}`, {
-          method: 'GET',
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -88,9 +104,9 @@ export default function Chat() {
 
         const data = await res.json();
 
-        setOtherParticipants(data.otherParticipants || []);
         setChat(data.chat);
-        setChatTitle(data.chat.title);
+        setOtherParticipants(data.otherParticipants || []);
+        setNewTitle(data.chat?.title || '');
       } catch (err) {
         setChatError(err.message || 'Something went wrong');
       } finally {
@@ -109,7 +125,6 @@ export default function Chat() {
         setMessageError('');
 
         const res = await fetch(`${apiUrl}/chat/${chatId}/messages`, {
-          method: 'GET',
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -137,6 +152,112 @@ export default function Chat() {
     fetchMessages();
   }, [apiUrl, chatId, token]);
 
+  useEffect(() => {
+    const trimmed = searchTerm.trim();
+
+    if (!token || !trimmed || !showSearchUser) {
+      setSearchResults([]);
+      setSearchErrors('');
+      setLoadingSearchUser(false);
+      return;
+    }
+
+    const timeout = setTimeout(async () => {
+      try {
+        setSearchErrors('');
+        setLoadingSearchUser(true);
+
+        const res = await fetch(
+          `${apiUrl}/user/search?q=${encodeURIComponent(trimmed)}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+        );
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => null);
+          throw new Error(data?.error || `Something went wrong: ${res.status}`);
+        }
+
+        const data = await res.json();
+        setSearchResults(data.users || []);
+      } catch (err) {
+        setSearchErrors(err.message || 'Something went wrong');
+      } finally {
+        setLoadingSearchUser(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(timeout);
+  }, [apiUrl, searchTerm, token, showSearchUser]);
+
+  function resetUserSearchState() {
+    setSearchTerm('');
+    setSearchResults([]);
+    setSelectedUsers([]);
+    setSearchErrors('');
+    setAddUsersError('');
+  }
+
+  function handleSettingsClick() {
+    setShowSettings((prev) => !prev);
+  }
+
+  function handleRenameChat() {
+    setShowTitleForm(true);
+    setShowSettings(false);
+    setNewTitleError('');
+  }
+
+  function handleCloseTitleForm() {
+    setShowTitleForm(false);
+    setNewTitleError('');
+    setNewTitle(chat?.title || '');
+  }
+
+  function handleShowUserSearch() {
+    setShowSearchUser(true);
+    setAddUsersError('');
+    setSearchErrors('');
+  }
+
+  function handleCloseUserSearch() {
+    setShowSearchUser(false);
+    resetUserSearchState();
+  }
+
+  function toggleSelectedUser(clickedUser) {
+    setSelectedUsers((prev) => {
+      const exists = prev.some((u) => u.id === clickedUser.id);
+
+      if (exists) {
+        return prev.filter((u) => u.id !== clickedUser.id);
+      }
+
+      return [...prev, clickedUser];
+    });
+  }
+
+  async function refreshChat() {
+    const res = await fetch(`${apiUrl}/chat/${chatId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(data?.error || data?.message || 'Failed to refresh chat');
+    }
+
+    setChat(data.chat);
+    setOtherParticipants(data.otherParticipants || []);
+    setNewTitle(data.chat?.title || '');
+  }
+
   async function handleSend() {
     if (!message.trim() || sendingMessage) return;
 
@@ -151,7 +272,7 @@ export default function Chat() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: message,
+          content: message.trim(),
         }),
       });
 
@@ -177,18 +298,9 @@ export default function Chat() {
     }
   }
 
-  // Settings handler
-  function handleSettingsClick() {
-    setShowSettings((prev) => !prev);
-  }
-
-  // Rename chat handlers
-  async function handleRenameChat() {
-    setShowTitleForm((prev) => !prev);
-  }
-
   async function handleTitleFormSubmit(e) {
     e.preventDefault();
+
     if (!newTitle.trim() || newTitleLoading) return;
 
     try {
@@ -201,9 +313,8 @@ export default function Chat() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-
         body: JSON.stringify({
-          newTitle,
+          newTitle: newTitle.trim(),
         }),
       });
 
@@ -214,24 +325,69 @@ export default function Chat() {
         );
       }
 
-      setChatTitle(newTitle);
-      setNewTitle('');
-      window.location.reload();
+      setChat((prev) =>
+        prev
+          ? {
+              ...prev,
+              title: newTitle.trim(),
+            }
+          : prev,
+      );
+
+      setShowTitleForm(false);
+      setNewTitleError('');
     } catch (err) {
       setNewTitleError(err.message || 'Something went wrong');
     } finally {
       setNewTitleLoading(false);
-      setShowTitleForm(false);
-      setShowSettings(false);
     }
   }
 
-  function handleCloseTitleForm() {
-    setShowTitleForm(false);
-    setShowSettings(false);
+  async function handleAddUserToGroup() {
+    if (!chat?.id || chat.type !== 'GROUP' || isAddingUsers) return;
+
+    const userIdsToAdd = selectedUsers
+      .map((selectedUser) => selectedUser.id)
+      .filter(Boolean)
+      .filter((id) => !existingUserIds.includes(id));
+
+    if (userIdsToAdd.length === 0) {
+      setAddUsersError('Please select at least one valid user to add');
+      return;
+    }
+
+    try {
+      setIsAddingUsers(true);
+      setAddUsersError('');
+
+      const res = await fetch(`${apiUrl}/chat/${chat.id}/add-to-group`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          participants: userIdsToAdd,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          data?.error || data?.message || 'Failed to add users to group',
+        );
+      }
+
+      await refreshChat();
+      handleCloseUserSearch();
+    } catch (err) {
+      setAddUsersError(err.message || 'Something went wrong');
+    } finally {
+      setIsAddingUsers(false);
+    }
   }
 
-  // Leave chat (group only) handler
   async function handleLeaveChat() {}
 
   if (loadingChat) {
@@ -253,11 +409,164 @@ export default function Chat() {
   return (
     <main className={styles.main}>
       <div className={`${styles.mainHeader} contains-icon`}>
-        <h2 className={styles.chatTitle}>
-          {chat?.type === 'GROUP'
-            ? chat.title || 'Group Chat'
-            : chatTitle || otherParticipants[0]?.user?.displayName || 'Chat'}
-        </h2>
+        {chat?.type === 'GROUP' && (
+          <div className={styles.addUserWrapper}>
+            <FaUserPlus
+              className={styles.addUser}
+              onClick={handleShowUserSearch}
+            />
+
+            {showSearchUser && (
+              <div
+                className={styles.userSearchOverlay}
+                onClick={handleCloseUserSearch}
+              >
+                <div
+                  className={styles.userSearchModal}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className={styles.userSearchHeader}>
+                    <h3 className={styles.userSearchTitle}>
+                      Add Users to Group
+                    </h3>
+                    <FaRegWindowClose
+                      className={styles.userSearchClose}
+                      onClick={handleCloseUserSearch}
+                    />
+                  </div>
+
+                  <form
+                    className={styles.userSearchForm}
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleAddUserToGroup();
+                    }}
+                  >
+                    <label className={styles.label}>
+                      Search users
+                      <input
+                        className={styles.input}
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        placeholder="Search by username or display name"
+                      />
+                    </label>
+
+                    {loadingSearchUser && (
+                      <p className={styles.searchStatus}>Searching...</p>
+                    )}
+
+                    {searchErrors && (
+                      <p className={styles.searchError}>{searchErrors}</p>
+                    )}
+
+                    {addUsersError && (
+                      <p className={styles.searchError}>{addUsersError}</p>
+                    )}
+
+                    {selectedUsers.length > 0 && (
+                      <div className={styles.selectedSection}>
+                        <h4 className={styles.selectedTitle}>Selected Users</h4>
+
+                        <div className={styles.selectedUsers}>
+                          {selectedUsers.map((selectedUser) => (
+                            <button
+                              key={selectedUser.id}
+                              type="button"
+                              className={styles.selectedChip}
+                              onClick={() => toggleSelectedUser(selectedUser)}
+                            >
+                              {selectedUser.displayName} ✕
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={styles.results}>
+                      {searchResults.length === 0 &&
+                      searchTerm.trim() &&
+                      !loadingSearchUser ? (
+                        <p className={styles.searchStatus}>No users found.</p>
+                      ) : (
+                        searchResults.map((searchUser) => {
+                          const isSelected = selectedUsers.some(
+                            (selectedUser) => selectedUser.id === searchUser.id,
+                          );
+                          const isExisting = existingUserIds.includes(
+                            searchUser.id,
+                          );
+
+                          return (
+                            <button
+                              key={searchUser.id}
+                              type="button"
+                              className={`${styles.userButton} ${
+                                isSelected ? styles.userButtonSelected : ''
+                              } ${isExisting ? styles.userButtonDisabled : ''}`}
+                              onClick={() => {
+                                if (isExisting) return;
+                                toggleSelectedUser(searchUser);
+                              }}
+                              disabled={isExisting}
+                            >
+                              <div className={styles.userRow}>
+                                <img
+                                  className={styles.userAvatar}
+                                  src="https://hwchamber.co.uk/wp-content/uploads/2022/04/avatar-placeholder.gif"
+                                  alt={`${searchUser.displayName}'s avatar`}
+                                />
+
+                                <div className={styles.userMeta}>
+                                  <span className={styles.displayName}>
+                                    {searchUser.displayName}
+                                  </span>
+                                  <span className={styles.username}>
+                                    @{searchUser.username}
+                                  </span>
+                                </div>
+
+                                <span className={styles.userStatus}>
+                                  {isExisting
+                                    ? 'In group'
+                                    : isSelected
+                                      ? '✓'
+                                      : ''}
+                                </span>
+                              </div>
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <div className={styles.userSearchActions}>
+                      <button
+                        type="button"
+                        className={styles.userSearchCancel}
+                        onClick={handleCloseUserSearch}
+                      >
+                        Cancel
+                      </button>
+
+                      <button
+                        type="submit"
+                        className={styles.userSearchSubmit}
+                        disabled={selectedUsers.length === 0 || isAddingUsers}
+                      >
+                        {isAddingUsers ? 'Adding...' : 'Add Selected Users'}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <h2 className={styles.chatTitle}>{chatDisplayTitle}</h2>
+
         <div ref={settingsRef} className={styles.settingsWrapper}>
           <FaGear
             className={styles.settingsIcon}
@@ -265,56 +574,56 @@ export default function Chat() {
           />
 
           {showSettings && (
-            <>
-              <div className={styles.settingsDropdown}>
-                <div
-                  className={`${styles.dropdownItem} contains-icon`}
-                  onClick={handleRenameChat}
-                >
-                  <FaEdit />
-                  Rename Chat
-                </div>
-                {chat?.type === 'GROUP' && (
-                  <div
-                    className={`${styles.dropdownItem} contains-icon`}
-                    onClick={handleLeaveChat}
-                  >
-                    <FaArrowRightFromBracket />
-                    Leave
-                  </div>
-                )}
+            <div className={styles.settingsDropdown}>
+              <div
+                className={`${styles.dropdownItem} contains-icon`}
+                onClick={handleRenameChat}
+              >
+                <FaEdit />
+                Rename Chat
               </div>
 
-              {showTitleForm && (
-                <div className={styles.titleFormOverlay}>
-                  <form
-                    className={styles.titleForm}
-                    onSubmit={handleTitleFormSubmit}
-                  >
-                    <FaRegWindowClose
-                      className={styles.titleFormClose}
-                      onClick={handleCloseTitleForm}
-                    />
-                    <label>
-                      New Chat Name
-                      <input
-                        type="text"
-                        name="title"
-                        id="title"
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                      />
-                    </label>
-                    <button type="submit">Update</button>
-
-                    {newTitleError && <p>{newTitleError}</p>}
-                  </form>
+              {chat?.type === 'GROUP' && (
+                <div
+                  className={`${styles.dropdownItem} contains-icon`}
+                  onClick={handleLeaveChat}
+                >
+                  <FaArrowRightFromBracket />
+                  Leave
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>
+
+      {showTitleForm && (
+        <div className={styles.titleFormOverlay}>
+          <form className={styles.titleForm} onSubmit={handleTitleFormSubmit}>
+            <FaRegWindowClose
+              className={styles.titleFormClose}
+              onClick={handleCloseTitleForm}
+            />
+
+            <label>
+              New Chat Name
+              <input
+                type="text"
+                name="title"
+                id="title"
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+              />
+            </label>
+
+            <button type="submit" disabled={newTitleLoading}>
+              {newTitleLoading ? 'Updating...' : 'Update'}
+            </button>
+
+            {newTitleError && <p>{newTitleError}</p>}
+          </form>
+        </div>
+      )}
 
       <div className={styles.chatContainer}>
         <div className={styles.chat} ref={chatRef}>
