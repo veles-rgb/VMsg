@@ -46,6 +46,13 @@
     color: white;
 }
 
+.addUser {
+    grid-column: 1;
+    justify-self: start;
+    cursor: pointer;
+    color: white;
+}
+
 .chat {
     flex: 1;
     min-height: 0;
@@ -284,4 +291,254 @@
 .titleFormClose:hover {
     cursor: pointer;
     opacity: 0.7;
+}
+
+.addUserWrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.addUser {
+    cursor: pointer;
+    font-size: 1.15rem;
+}
+
+.addUser:hover {
+    opacity: 0.8;
+}
+
+.userSearchOverlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.68);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.userSearchModal {
+    width: min(640px, 100%);
+    max-height: 85vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
+}
+
+.userSearchHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.userSearchTitle {
+    margin: 0;
+    font-size: 1.15rem;
+}
+
+.userSearchClose {
+    cursor: pointer;
+    font-size: 1.2rem;
+    flex: 0 0 auto;
+}
+
+.userSearchClose:hover {
+    opacity: 0.75;
+}
+
+.userSearchForm {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    padding: 1rem 1.25rem 1.25rem;
+    min-height: 0;
+}
+
+.label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    font-weight: 600;
+}
+
+.input {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    border-radius: 0.85rem;
+    padding: 0.9rem 1rem;
+    font-size: 1rem;
+    background: white;
+    color: black;
+    box-sizing: border-box;
+}
+
+.searchStatus {
+    margin: 0;
+    color: var(--color-text-secondary);
+}
+
+.searchError {
+    margin: 0;
+    color: var(--color-danger);
+    font-weight: 600;
+}
+
+.selectedSection {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.selectedTitle {
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+.selectedUsers {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+}
+
+.selectedChip {
+    border: 1px solid var(--color-border);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-primary);
+    border-radius: 999px;
+    padding: 0.55rem 0.8rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    cursor: pointer;
+}
+
+.selectedChip:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.results {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    max-height: 280px;
+    overflow-y: auto;
+    padding-right: 0.2rem;
+}
+
+.userButton {
+    width: 100%;
+    border: 1px solid var(--color-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--color-text-primary);
+    border-radius: 0.9rem;
+    padding: 0.85rem 0.95rem;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.userButton:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.userButton:active {
+    transform: scale(0.99);
+}
+
+.userButtonSelected {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: var(--color-primary-light);
+}
+
+.userRow {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.userAvatar {
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    object-fit: cover;
+    flex: 0 0 42px;
+}
+
+.userMeta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    min-width: 0;
+    flex: 1;
+}
+
+.displayName {
+    font-weight: 700;
+}
+
+.username {
+    color: var(--color-text-secondary);
+    font-size: 0.92rem;
+}
+
+.userCheck {
+    font-weight: 700;
+    font-size: 1rem;
+    flex: 0 0 auto;
+}
+
+.userSearchActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    padding-top: 0.25rem;
+}
+
+.userSearchCancel,
+.userSearchSubmit {
+    border: none;
+    border-radius: 0.9rem;
+    padding: 0.85rem 1rem;
+    font-size: 0.98rem;
+    cursor: pointer;
+}
+
+.userSearchCancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-primary);
+}
+
+.userSearchSubmit {
+    background: var(--color-primary);
+    color: white;
+}
+
+.userSearchSubmit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.userButtonDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.userButtonDisabled:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.userStatus {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
 }
