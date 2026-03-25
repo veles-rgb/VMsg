@@ -31,29 +31,6 @@ function App() {
     checkAuth();
   }, [token, logout, verify]);
 
-  useEffect(() => {
-    if (!token) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`${apiUrl}/user/heartbeat`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (res.status === 401) {
-          logout();
-        }
-      } catch (err) {
-        console.error(err);
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, [apiUrl, token, logout]);
-
   if (authLoading) {
     return <p>Loading...</p>;
   }
