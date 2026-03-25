@@ -12,5 +12,6 @@ router.post('/:chatId/messages', controller.sendChatMsg);
 router.patch('/:chatId/rename', controller.renameChat);
 router.patch('/:chatId/add-to-group', controller.addToGroup);
 router.patch('/:chatId/leave', controller.leaveGroup);
+router.patch('/:chatId/hide', controller.hideChat);
 
 module.exports = router;
