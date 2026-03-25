@@ -4,6 +4,13 @@ import { useAuth } from '../auth/AuthContext';
 
 import styles from './styles/CreateChat.module.css';
 
+const DEFAULT_AVATAR =
+  'https://simplyilm.com/wp-content/uploads/2017/08/temporary-profile-placeholder-1.jpg';
+
+function getAvatarSrc(profilePictureUrl) {
+  return profilePictureUrl || DEFAULT_AVATAR;
+}
+
 export default function CreateChat() {
   const { type } = useParams();
   const navigate = useNavigate();
@@ -36,6 +43,7 @@ export default function CreateChat() {
     if (!trimmed) {
       setSearchResults([]);
       setSearchErrors('');
+      setSearchLoading(false);
       return;
     }
 
@@ -72,10 +80,10 @@ export default function CreateChat() {
 
   function toggleSelectedUser(clickedUser) {
     setSelectedUsers((prev) => {
-      const exists = prev.some((u) => u.id === clickedUser.id);
+      const exists = prev.some((user) => user.id === clickedUser.id);
 
       if (exists) {
-        return prev.filter((u) => u.id !== clickedUser.id);
+        return prev.filter((user) => user.id !== clickedUser.id);
       }
 
       return [...prev, clickedUser];
@@ -135,7 +143,7 @@ export default function CreateChat() {
         },
         body: JSON.stringify({
           title: groupTitle.trim(),
-          participants: selectedUsers.map((u) => u.id),
+          participants: selectedUsers.map((user) => user.id),
         }),
       });
 
@@ -172,9 +180,7 @@ export default function CreateChat() {
             </label>
 
             {searchLoading && <p className={styles.status}>Searching...</p>}
-
             {searchErrors && <p className={styles.error}>{searchErrors}</p>}
-
             {createError && <p className={styles.error}>{createError}</p>}
 
             <div className={styles.results}>
@@ -187,6 +193,12 @@ export default function CreateChat() {
                   disabled={createLoading}
                 >
                   <div className={styles.userRow}>
+                    <img
+                      className={styles.userAvatar}
+                      src={getAvatarSrc(user?.profilePictureUrl)}
+                      alt={`${user?.displayName || 'User'}'s avatar`}
+                    />
+
                     <div className={styles.userMeta}>
                       <span className={styles.displayName}>
                         {user.displayName}
@@ -228,9 +240,7 @@ export default function CreateChat() {
               </label>
 
               {searchLoading && <p className={styles.status}>Searching...</p>}
-
               {searchErrors && <p className={styles.error}>{searchErrors}</p>}
-
               {createError && <p className={styles.error}>{createError}</p>}
 
               {selectedUsers.length > 0 && (
@@ -245,7 +255,13 @@ export default function CreateChat() {
                         className={styles.selectedChip}
                         onClick={() => toggleSelectedUser(user)}
                       >
-                        {user.displayName} ✕
+                        <img
+                          className={styles.selectedChipAvatar}
+                          src={getAvatarSrc(user?.profilePictureUrl)}
+                          alt={`${user?.displayName || 'User'}'s avatar`}
+                        />
+                        <span>{user.displayName}</span>
+                        <span>✕</span>
                       </button>
                     ))}
                   </div>
@@ -262,19 +278,30 @@ export default function CreateChat() {
                     <button
                       key={user.id}
                       type="button"
-                      className={styles.userButton}
+                      className={`${styles.userButton} ${
+                        isSelected ? styles.userButtonSelected : ''
+                      }`}
                       onClick={() => toggleSelectedUser(user)}
                     >
                       <div className={styles.userRow}>
+                        <img
+                          className={styles.userAvatar}
+                          src={getAvatarSrc(user?.profilePictureUrl)}
+                          alt={`${user?.displayName || 'User'}'s avatar`}
+                        />
+
                         <div className={styles.userMeta}>
                           <span className={styles.displayName}>
-                            {isSelected ? '✓ ' : ''}
                             {user.displayName}
                           </span>
                           <span className={styles.username}>
                             @{user.username}
                           </span>
                         </div>
+
+                        <span className={styles.userStatus}>
+                          {isSelected ? '✓' : ''}
+                        </span>
                       </div>
                     </button>
                   );
