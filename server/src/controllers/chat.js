@@ -1,4 +1,5 @@
 const { prisma } = require('../../lib/prisma.mjs');
+const { emitToUsers, emitToChat } = require('../socket');
 
 async function createDm(req, res, next) {
     try {
@@ -6,14 +7,26 @@ async function createDm(req, res, next) {
         const { targetId } = req.body;
 
         if (!targetId) {
-            return res.status(400).json({ error: "targetId is required" });
+            return res.status(400).json({ error: 'targetId is required' });
         }
 
         if (targetId === userId) {
-            return res.status(400).json({ error: "You cannot create a DM with yourself" });
+            return res.status(400).json({ error: 'You cannot create a DM with yourself' });
         }
 
-        // Check for existing chat
+        const targetUser = await prisma.user.findUnique({
+            where: {
+                id: targetId,
+            },
+            select: {
+                id: true,
+            },
+        });
+
+        if (!targetUser) {
+            return res.status(404).json({ error: 'Target user not found' });
+        }
+
         const existing = await prisma.chat.findFirst({
             where: {
                 type: 'DM',
@@ -22,7 +35,6 @@ async function createDm(req, res, next) {
                         participants: {
                             some: {
                                 userId,
-                                leftAt: null,
                             },
                         },
                     },
@@ -30,40 +42,59 @@ async function createDm(req, res, next) {
                         participants: {
                             some: {
                                 userId: targetId,
-                                leftAt: null,
                             },
                         },
                     },
                 ],
             },
+            select: {
+                id: true,
+            },
         });
 
-        // Return chatId if existing
         if (existing) {
+            await prisma.chatParticipant.updateMany({
+                where: {
+                    chatId: existing.id,
+                    userId,
+                },
+                data: {
+                    leftAt: null,
+                    hiddenAt: null,
+                },
+            });
+
+            emitToUsers([userId, targetId], 'sidebar:refresh', { chatId: existing.id });
+
             return res.json({ chatId: existing.id });
         }
 
-        // Create new chat
         const chat = await prisma.chat.create({
             data: {
                 type: 'DM',
                 createdByUserId: userId,
             },
+            select: {
+                id: true,
+            },
         });
 
-        // Create chat participants
         await prisma.chatParticipant.createMany({
             data: [
                 {
                     chatId: chat.id,
                     userId,
+                    unreadCount: 0,
                 },
                 {
                     chatId: chat.id,
                     userId: targetId,
+                    unreadCount: 0,
                 },
             ],
         });
+
+        emitToUsers([userId, targetId], 'sidebar:refresh', { chatId: chat.id });
 
         return res.status(201).json({ chatId: chat.id });
     } catch (err) {
@@ -113,6 +144,9 @@ async function createGroup(req, res, next) {
                 title: title.trim(),
                 createdByUserId,
             },
+            select: {
+                id: true,
+            },
         });
 
         await prisma.chatParticipant.createMany({
@@ -120,12 +154,18 @@ async function createGroup(req, res, next) {
                 {
                     chatId: chat.id,
                     userId: createdByUserId,
+                    unreadCount: 0,
                 },
                 ...uniqueParticipantIds.map((userId) => ({
                     chatId: chat.id,
                     userId,
+                    unreadCount: 0,
                 })),
             ],
+        });
+
+        emitToUsers([createdByUserId, ...uniqueParticipantIds], 'sidebar:refresh', {
+            chatId: chat.id,
         });
 
         return res.status(201).json({ chatId: chat.id });
@@ -144,6 +184,7 @@ async function getAllChats(req, res, next) {
                     some: {
                         userId,
                         leftAt: null,
+                        hiddenAt: null,
                     },
                 },
             },
@@ -161,6 +202,7 @@ async function getAllChats(req, res, next) {
                                 id: true,
                                 username: true,
                                 displayName: true,
+                                profilePictureUrl: true,
                             },
                         },
                     },
@@ -169,12 +211,17 @@ async function getAllChats(req, res, next) {
         });
 
         const chatsWithOtherParticipants = chats.map((chat) => {
+            const currentParticipant = chat.participants.find(
+                (participant) => participant.userId === userId
+            );
+
             const otherParticipants = chat.participants.filter(
                 (participant) => participant.userId !== userId
             );
 
             return {
                 ...chat,
+                unreadCount: currentParticipant?.unreadCount || 0,
                 otherParticipants,
             };
         });
@@ -211,6 +258,7 @@ async function getChatById(req, res, next) {
                                 id: true,
                                 username: true,
                                 displayName: true,
+                                profilePictureUrl: true,
                             },
                         },
                     },
@@ -256,6 +304,18 @@ async function getChatMessages(req, res, next) {
             return res.status(404).json({ error: 'Chat not found' });
         }
 
+        await prisma.chatParticipant.update({
+            where: {
+                chatId_userId: {
+                    chatId,
+                    userId,
+                },
+            },
+            data: {
+                unreadCount: 0,
+            },
+        });
+
         const messages = await prisma.message.findMany({
             where: {
                 chatId,
@@ -263,16 +323,27 @@ async function getChatMessages(req, res, next) {
             orderBy: {
                 sentAt: 'asc',
             },
-            include: {
+            select: {
+                id: true,
+                content: true,
+                sentAt: true,
+                attachmentUrl: true,
+                attachmentPublicId: true,
+                attachmentType: true,
+                attachmentName: true,
+                attachmentBytes: true,
                 sender: {
                     select: {
                         id: true,
                         username: true,
                         displayName: true,
+                        profilePictureUrl: true,
                     },
                 },
             },
         });
+
+        emitToUsers([userId], 'sidebar:refresh', { chatId });
 
         return res.json({ messages });
     } catch (err) {
@@ -283,11 +354,23 @@ async function getChatMessages(req, res, next) {
 async function sendChatMsg(req, res, next) {
     try {
         const { chatId } = req.params;
-        const { content } = req.body;
         const senderUserId = req.user.id;
 
-        if (!content || !content.trim()) {
-            return res.status(400).json({ error: "Message content is required" });
+        const {
+            content,
+            attachmentUrl,
+            attachmentPublicId,
+            attachmentType,
+            attachmentName,
+            attachmentBytes,
+        } = req.body;
+
+        const trimmedContent = content?.trim() || null;
+
+        if (!trimmedContent && !attachmentUrl) {
+            return res.status(400).json({
+                error: 'Message content or attachment is required',
+            });
         }
 
         const chat = await prisma.chat.findFirst({
@@ -300,18 +383,25 @@ async function sendChatMsg(req, res, next) {
                     },
                 },
             },
-            select: { id: true },
+            select: {
+                id: true,
+            },
         });
 
         if (!chat) {
-            return res.status(404).json({ error: "Chat not found" });
+            return res.status(404).json({ error: 'Chat not found' });
         }
 
         const message = await prisma.message.create({
             data: {
                 chatId,
                 senderUserId,
-                content: content.trim(),
+                content: trimmedContent,
+                attachmentUrl: attachmentUrl || null,
+                attachmentPublicId: attachmentPublicId || null,
+                attachmentType: attachmentType || null,
+                attachmentName: attachmentName || null,
+                attachmentBytes: attachmentBytes || null,
             },
             include: {
                 sender: {
@@ -319,14 +409,77 @@ async function sendChatMsg(req, res, next) {
                         id: true,
                         username: true,
                         displayName: true,
+                        profilePictureUrl: true,
                     },
                 },
             },
         });
 
+        await prisma.chatParticipant.updateMany({
+            where: {
+                chatId,
+                leftAt: null,
+            },
+            data: {
+                hiddenAt: null,
+            },
+        });
+
+        await prisma.chatParticipant.updateMany({
+            where: {
+                chatId,
+                leftAt: null,
+                userId: {
+                    not: senderUserId,
+                },
+            },
+            data: {
+                unreadCount: {
+                    increment: 1,
+                },
+            },
+        });
+
+        await prisma.chatParticipant.update({
+            where: {
+                chatId_userId: {
+                    chatId,
+                    userId: senderUserId,
+                },
+            },
+            data: {
+                unreadCount: 0,
+            },
+        });
+
         await prisma.chat.update({
-            where: { id: chatId },
-            data: { lastMessageAt: new Date() },
+            where: {
+                id: chatId,
+            },
+            data: {
+                lastMessageAt: new Date(),
+            },
+        });
+
+        const participants = await prisma.chatParticipant.findMany({
+            where: {
+                chatId,
+                leftAt: null,
+            },
+            select: {
+                userId: true,
+            },
+        });
+
+        const participantIds = participants.map((participant) => participant.userId);
+
+        emitToChat(chatId, 'chat:message_created', {
+            chatId,
+            message,
+        });
+
+        emitToUsers(participantIds, 'sidebar:refresh', {
+            chatId,
         });
 
         return res.status(201).json({ message });
@@ -341,12 +494,22 @@ async function renameChat(req, res, next) {
         const userId = req.user.id;
         const { newTitle } = req.body;
 
+        const trimmedTitle = newTitle?.trim();
+
+        if (!trimmedTitle) {
+            return res.status(400).json({ error: 'New title is required' });
+        }
+
+        if (trimmedTitle.length > 100) {
+            return res.status(400).json({ error: 'Chat title must be 100 characters or less' });
+        }
+
         const chat = await prisma.chat.findFirst({
             where: {
                 id: chatId,
                 participants: {
                     some: {
-                        userId: userId,
+                        userId,
                         leftAt: null,
                     },
                 },
@@ -354,23 +517,33 @@ async function renameChat(req, res, next) {
         });
 
         if (!chat) {
-            return res.status(404).json({ message: "Chat not found" });
+            return res.status(404).json({ message: 'Chat not found' });
         }
 
         await prisma.chat.update({
             where: {
                 id: chatId,
-                participants: {
-                    some: {
-                        userId: userId,
-                        leftAt: null,
-                    },
-                },
             },
             data: {
-                title: newTitle
-            }
+                title: trimmedTitle,
+            },
         });
+
+        const participants = await prisma.chatParticipant.findMany({
+            where: {
+                chatId,
+                leftAt: null,
+            },
+            select: {
+                userId: true,
+            },
+        });
+
+        emitToUsers(
+            participants.map((participant) => participant.userId),
+            'sidebar:refresh',
+            { chatId }
+        );
 
         return res.status(200).json({ message: 'Chat title updated' });
     } catch (err) {
@@ -449,8 +622,25 @@ async function addToGroup(req, res, next) {
             data: uniqueParticipantIds.map((userId) => ({
                 chatId,
                 userId,
+                unreadCount: 0,
             })),
         });
+
+        const activeParticipants = await prisma.chatParticipant.findMany({
+            where: {
+                chatId,
+                leftAt: null,
+            },
+            select: {
+                userId: true,
+            },
+        });
+
+        emitToUsers(
+            activeParticipants.map((participant) => participant.userId),
+            'sidebar:refresh',
+            { chatId }
+        );
 
         return res.status(200).json({ ok: true });
     } catch (error) {
@@ -504,7 +694,64 @@ async function leaveGroup(req, res, next) {
             },
         });
 
+        const remainingParticipants = await prisma.chatParticipant.findMany({
+            where: {
+                chatId,
+                leftAt: null,
+            },
+            select: {
+                userId: true,
+            },
+        });
+
+        emitToUsers(
+            [userId, ...remainingParticipants.map((participant) => participant.userId)],
+            'sidebar:refresh',
+            { chatId }
+        );
+
         return res.status(200).json({ ok: true });
+    } catch (err) {
+        return next(err);
+    }
+}
+
+async function hideChat(req, res, next) {
+    try {
+        const { chatId } = req.params;
+        const userId = req.user.id;
+
+        const participant = await prisma.chatParticipant.findFirst({
+            where: {
+                chatId,
+                userId,
+                leftAt: null,
+            },
+            select: {
+                chatId: true,
+                userId: true,
+            },
+        });
+
+        if (!participant) {
+            return res.status(404).json({ error: 'Chat not found' });
+        }
+
+        await prisma.chatParticipant.update({
+            where: {
+                chatId_userId: {
+                    chatId,
+                    userId,
+                },
+            },
+            data: {
+                hiddenAt: new Date(),
+            },
+        });
+
+        emitToUsers([userId], 'sidebar:refresh', { chatId });
+
+        return res.json({ ok: true });
     } catch (err) {
         return next(err);
     }
@@ -519,5 +766,6 @@ module.exports = {
     sendChatMsg,
     renameChat,
     addToGroup,
-    leaveGroup
+    leaveGroup,
+    hideChat,
 };
