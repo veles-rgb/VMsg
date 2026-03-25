@@ -1,41 +1,30 @@
 const { prisma } = require('../../lib/prisma.mjs');
 const uploadToCloudinary = require('../utils/uploadToCloudinary');
-
-async function heartbeat(req, res, next) {
-    try {
-        await prisma.user.update({
-            where: {
-                id: req.user.id,
-            },
-            data: {
-                lastSeenAt: new Date()
-            },
-        });
-
-        return res.json({ ok: true });
-    } catch (err) {
-        return next(err);
-    }
-}
+const { getOnlineUserIds } = require('../socket');
 
 async function getOnlineUsers(req, res, next) {
     try {
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        const currentUserId = req.user.id;
+        const onlineUserIds = getOnlineUserIds().filter((id) => id !== currentUserId);
+
+        if (onlineUserIds.length === 0) {
+            return res.json({ users: [] });
+        }
 
         const online = await prisma.user.findMany({
             where: {
-                lastSeenAt: {
-                    gte: fiveMinutesAgo
-                }
+                id: {
+                    in: onlineUserIds,
+                },
             },
             orderBy: {
-                displayName: 'asc'
+                displayName: 'asc',
             },
             select: {
                 id: true,
                 username: true,
                 displayName: true,
-                lastSeenAt: true
+                profilePictureUrl: true,
             },
         });
 
@@ -77,7 +66,8 @@ async function searchUsers(req, res, next) {
             select: {
                 id: true,
                 username: true,
-                displayName: true
+                displayName: true,
+                profilePictureUrl: true
             },
             take: 20,
             orderBy: {
@@ -184,7 +174,6 @@ async function updateDisplayName(req, res, next) {
 }
 
 module.exports = {
-    heartbeat,
     getOnlineUsers,
     searchUsers,
     uploadProfilePicture,
