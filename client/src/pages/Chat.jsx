@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { formatDate } from '../utils/formatDate';
 import styles from './styles/Chat.module.css';
+import { getSocket } from '../socket';
 
 import {
   FaGear,
@@ -15,14 +16,36 @@ import {
 
 import { FaEdit, FaRegWindowClose, FaUsers } from 'react-icons/fa';
 
+const DEFAULT_AVATAR =
+  'https://simplyilm.com/wp-content/uploads/2017/08/temporary-profile-placeholder-1.jpg';
+
+function getAvatarSrc(profilePictureUrl) {
+  return profilePictureUrl || DEFAULT_AVATAR;
+}
+
+function formatBytes(bytes) {
+  if (!bytes || Number.isNaN(Number(bytes))) return '';
+  const value = Number(bytes);
+
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+  if (value < 1024 * 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+}
+
 export default function Chat() {
   const { chatId } = useParams();
+  const navigate = useNavigate();
   const { token, user } = useAuth();
   const apiUrl = import.meta.env.VITE_API_URL;
 
   const textareaRef = useRef(null);
   const chatRef = useRef(null);
   const settingsRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const [chat, setChat] = useState(null);
   const [otherParticipants, setOtherParticipants] = useState([]);
@@ -48,25 +71,25 @@ export default function Chat() {
   const [showSettings, setShowSettings] = useState(false);
   const [showTitleForm, setShowTitleForm] = useState(false);
   const [showSearchUser, setShowSearchUser] = useState(false);
+  const [showUsersModal, setShowUsersModal] = useState(false);
 
   const [searchResults, setSearchResults] = useState([]);
   const [selectedUsers, setSelectedUsers] = useState([]);
 
-  const [showUsersModal, setShowUsersModal] = useState(false);
+  const [selectedAttachment, setSelectedAttachment] = useState(null);
+  const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState(null);
 
   const existingUserIds = useMemo(
     () => chat?.participants?.map((p) => p.userId) || [],
     [chat],
   );
 
-  const groupParticipants = useMemo(() => {
-    return chat?.participants || [];
-  }, [chat]);
+  const groupParticipants = useMemo(() => chat?.participants || [], [chat]);
 
   const chatDisplayTitle =
     chat?.type === 'GROUP'
       ? chat?.title || 'Group Chat'
-      : chat?.title || otherParticipants[0]?.user?.displayName;
+      : chat?.title || otherParticipants[0]?.user?.displayName || 'Chat';
 
   useEffect(() => {
     if (!chatRef.current) return;
@@ -88,31 +111,64 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    async function fetchChat() {
+    return () => {
+      if (attachmentPreviewUrl) {
+        URL.revokeObjectURL(attachmentPreviewUrl);
+      }
+    };
+  }, [attachmentPreviewUrl]);
+
+  const refreshChat = useCallback(async () => {
+    const res = await fetch(`${apiUrl}/chat/${chatId}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      throw new Error(data?.error || data?.message || 'Failed to refresh chat');
+    }
+
+    setChat(data.chat);
+    setOtherParticipants(data.otherParticipants || []);
+    setNewTitle(data.chat?.title || '');
+  }, [apiUrl, chatId, token]);
+
+  const fetchMessages = useCallback(async () => {
+    try {
+      setLoadingMessages(true);
+      setMessageError('');
+
+      const res = await fetch(`${apiUrl}/chat/${chatId}/messages`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(
+          data?.error || data?.message || `Something went wrong: ${res.status}`,
+        );
+      }
+
+      const data = await res.json();
+      setMessages(data.messages || []);
+    } catch (err) {
+      setMessageError(err.message || 'Something went wrong');
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, [apiUrl, chatId, token]);
+
+  useEffect(() => {
+    async function loadChat() {
       try {
         setLoadingChat(true);
         setChatError('');
-
-        const res = await fetch(`${apiUrl}/chat/${chatId}`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => null);
-          throw new Error(
-            data?.error ||
-              data?.message ||
-              `Something went wrong: ${res.status}`,
-          );
-        }
-
-        const data = await res.json();
-
-        setChat(data.chat);
-        setOtherParticipants(data.otherParticipants || []);
-        setNewTitle(data.chat?.title || '');
+        await refreshChat();
       } catch (err) {
         setChatError(err.message || 'Something went wrong');
       } finally {
@@ -121,42 +177,53 @@ export default function Chat() {
     }
 
     if (!token) return;
-    fetchChat();
-  }, [apiUrl, chatId, token]);
+    loadChat();
+  }, [token, refreshChat]);
 
   useEffect(() => {
-    async function fetchMessages() {
-      try {
-        setLoadingMessages(true);
-        setMessageError('');
-
-        const res = await fetch(`${apiUrl}/chat/${chatId}/messages`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) {
-          const data = await res.json().catch(() => null);
-          throw new Error(
-            data?.error ||
-              data?.message ||
-              `Something went wrong: ${res.status}`,
-          );
-        }
-
-        const data = await res.json();
-        setMessages(data.messages || []);
-      } catch (err) {
-        setMessageError(err.message || 'Something went wrong');
-      } finally {
-        setLoadingMessages(false);
-      }
-    }
-
     if (!token) return;
     fetchMessages();
-  }, [apiUrl, chatId, token]);
+  }, [token, fetchMessages]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !chatId) return;
+
+    socket.emit('chat:join', chatId);
+
+    return () => {
+      socket.emit('chat:leave', chatId);
+    };
+  }, [chatId]);
+
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket || !chatId) return;
+
+    function handleIncomingMessage(payload) {
+      if (payload.chatId !== chatId || !payload.message) return;
+
+      setMessages((prev) => {
+        const exists = prev.some((msg) => msg.id === payload.message.id);
+        if (exists) return prev;
+        return [...prev, payload.message];
+      });
+    }
+
+    function handleSidebarRefresh(payload) {
+      if (!payload?.chatId || payload.chatId !== chatId) return;
+
+      refreshChat().catch(() => {});
+    }
+
+    socket.on('chat:message_created', handleIncomingMessage);
+    socket.on('sidebar:refresh', handleSidebarRefresh);
+
+    return () => {
+      socket.off('chat:message_created', handleIncomingMessage);
+      socket.off('sidebar:refresh', handleSidebarRefresh);
+    };
+  }, [chatId, refreshChat]);
 
   useEffect(() => {
     const trimmed = searchTerm.trim();
@@ -207,6 +274,19 @@ export default function Chat() {
     setAddUsersError('');
   }
 
+  function resetAttachmentState() {
+    if (attachmentPreviewUrl) {
+      URL.revokeObjectURL(attachmentPreviewUrl);
+    }
+
+    setSelectedAttachment(null);
+    setAttachmentPreviewUrl(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }
+
   function handleSettingsClick() {
     setShowSettings((prev) => !prev);
   }
@@ -234,6 +314,15 @@ export default function Chat() {
     resetUserSearchState();
   }
 
+  function handleOpenUsersModal() {
+    setShowUsersModal(true);
+    setShowSettings(false);
+  }
+
+  function handleCloseUsersModal() {
+    setShowUsersModal(false);
+  }
+
   function toggleSelectedUser(clickedUser) {
     setSelectedUsers((prev) => {
       const exists = prev.some((u) => u.id === clickedUser.id);
@@ -246,30 +335,63 @@ export default function Chat() {
     });
   }
 
-  async function refreshChat() {
-    const res = await fetch(`${apiUrl}/chat/${chatId}`, {
+  function handleAttachmentButtonClick() {
+    fileInputRef.current?.click();
+  }
+
+  function handleAttachmentChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setMessageError('');
+    setSelectedAttachment(file);
+
+    if (attachmentPreviewUrl) {
+      URL.revokeObjectURL(attachmentPreviewUrl);
+    }
+
+    if (file.type.startsWith('image/')) {
+      setAttachmentPreviewUrl(URL.createObjectURL(file));
+      return;
+    }
+
+    setAttachmentPreviewUrl(null);
+  }
+
+  async function uploadAttachmentIfNeeded() {
+    if (!selectedAttachment) return null;
+
+    const formData = new FormData();
+    formData.append('file', selectedAttachment);
+    formData.append('folderKey', 'chatAttachments');
+
+    const uploadRes = await fetch(`${apiUrl}/upload`, {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
       },
+      body: formData,
     });
 
-    const data = await res.json().catch(() => null);
+    const uploadData = await uploadRes.json().catch(() => null);
 
-    if (!res.ok) {
-      throw new Error(data?.error || data?.message || 'Failed to refresh chat');
+    if (!uploadRes.ok) {
+      throw new Error(
+        uploadData?.error || uploadData?.message || 'Failed to upload file',
+      );
     }
 
-    setChat(data.chat);
-    setOtherParticipants(data.otherParticipants || []);
-    setNewTitle(data.chat?.title || '');
+    return uploadData?.data || null;
   }
 
   async function handleSend() {
-    if (!message.trim() || sendingMessage) return;
+    if ((!message.trim() && !selectedAttachment) || sendingMessage) return;
 
     try {
       setSendingMessage(true);
       setMessageError('');
+
+      const uploadedAttachment = await uploadAttachmentIfNeeded();
 
       const res = await fetch(`${apiUrl}/chat/${chatId}/messages`, {
         method: 'POST',
@@ -279,20 +401,30 @@ export default function Chat() {
         },
         body: JSON.stringify({
           content: message.trim(),
+          attachmentUrl: uploadedAttachment?.url || null,
+          attachmentPublicId: uploadedAttachment?.publicId || null,
+          attachmentType: uploadedAttachment?.resourceType || null,
+          attachmentName: uploadedAttachment?.originalName || null,
+          attachmentBytes: uploadedAttachment?.bytes || null,
         }),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(
           data?.error || data?.message || `Something went wrong: ${res.status}`,
         );
       }
 
-      const data = await res.json();
+      setMessages((prev) => {
+        const exists = prev.some((msg) => msg.id === data.message?.id);
+        if (exists) return prev;
+        return [...prev, data.message];
+      });
 
-      setMessages((prev) => [...prev, data.message]);
       setMessage('');
+      resetAttachmentState();
 
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -394,15 +526,6 @@ export default function Chat() {
     }
   }
 
-  function handleOpenUsersModal() {
-    setShowUsersModal(true);
-    setShowSettings(false);
-  }
-
-  function handleCloseUsersModal() {
-    setShowUsersModal(false);
-  }
-
   async function handleLeaveChat() {
     if (!chat?.id || chat.type !== 'GROUP') return;
 
@@ -428,10 +551,50 @@ export default function Chat() {
         );
       }
 
-      window.location.href = '/messages';
+      navigate('/');
     } catch (err) {
       alert(err.message || 'Something went wrong');
     }
+  }
+
+  function renderAttachment(msg) {
+    if (!msg.attachmentUrl) return null;
+
+    if (msg.attachmentType === 'image') {
+      return (
+        <img
+          src={msg.attachmentUrl}
+          alt={msg.attachmentName || 'attachment'}
+          className={styles.messageImage}
+        />
+      );
+    }
+
+    if (msg.attachmentType === 'video') {
+      return (
+        <video controls className={styles.messageVideo}>
+          <source src={msg.attachmentUrl} />
+        </video>
+      );
+    }
+
+    return (
+      <a
+        href={msg.attachmentUrl}
+        target="_blank"
+        rel="noreferrer"
+        className={styles.messageFile}
+      >
+        <span className={styles.messageFileName}>
+          {msg.attachmentName || 'Open attachment'}
+        </span>
+        {msg.attachmentBytes ? (
+          <span className={styles.messageFileSize}>
+            {formatBytes(msg.attachmentBytes)}
+          </span>
+        ) : null}
+      </a>
+    );
   }
 
   if (loadingChat) {
@@ -452,161 +615,16 @@ export default function Chat() {
 
   return (
     <main className={styles.main}>
-      <div className={`${styles.mainHeader} contains-icon`}>
-        {chat?.type === 'GROUP' && (
-          <div className={styles.addUserWrapper}>
+      <div className={styles.mainHeader}>
+        {chat?.type === 'GROUP' ? (
+          <div className={styles.headerLeft}>
             <FaUserPlus
-              className={styles.addUser}
+              className={styles.headerIcon}
               onClick={handleShowUserSearch}
             />
-
-            {showSearchUser && (
-              <div
-                className={styles.userSearchOverlay}
-                onClick={handleCloseUserSearch}
-              >
-                <div
-                  className={styles.userSearchModal}
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className={styles.userSearchHeader}>
-                    <h3 className={styles.userSearchTitle}>
-                      Add Users to Group
-                    </h3>
-                    <FaRegWindowClose
-                      className={styles.userSearchClose}
-                      onClick={handleCloseUserSearch}
-                    />
-                  </div>
-
-                  <form
-                    className={styles.userSearchForm}
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleAddUserToGroup();
-                    }}
-                  >
-                    <label className={styles.label}>
-                      Search users
-                      <input
-                        className={styles.input}
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        placeholder="Search by username or display name"
-                      />
-                    </label>
-
-                    {loadingSearchUser && (
-                      <p className={styles.searchStatus}>Searching...</p>
-                    )}
-
-                    {searchErrors && (
-                      <p className={styles.searchError}>{searchErrors}</p>
-                    )}
-
-                    {addUsersError && (
-                      <p className={styles.searchError}>{addUsersError}</p>
-                    )}
-
-                    {selectedUsers.length > 0 && (
-                      <div className={styles.selectedSection}>
-                        <h4 className={styles.selectedTitle}>Selected Users</h4>
-
-                        <div className={styles.selectedUsers}>
-                          {selectedUsers.map((selectedUser) => (
-                            <button
-                              key={selectedUser.id}
-                              type="button"
-                              className={styles.selectedChip}
-                              onClick={() => toggleSelectedUser(selectedUser)}
-                            >
-                              {selectedUser.displayName} ✕
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    <div className={styles.results}>
-                      {searchResults.length === 0 &&
-                      searchTerm.trim() &&
-                      !loadingSearchUser ? (
-                        <p className={styles.searchStatus}>No users found.</p>
-                      ) : (
-                        searchResults.map((searchUser) => {
-                          const isSelected = selectedUsers.some(
-                            (selectedUser) => selectedUser.id === searchUser.id,
-                          );
-                          const isExisting = existingUserIds.includes(
-                            searchUser.id,
-                          );
-
-                          return (
-                            <button
-                              key={searchUser.id}
-                              type="button"
-                              className={`${styles.userButton} ${
-                                isSelected ? styles.userButtonSelected : ''
-                              } ${isExisting ? styles.userButtonDisabled : ''}`}
-                              onClick={() => {
-                                if (isExisting) return;
-                                toggleSelectedUser(searchUser);
-                              }}
-                              disabled={isExisting}
-                            >
-                              <div className={styles.userRow}>
-                                <img
-                                  className={styles.userAvatar}
-                                  src="https://hwchamber.co.uk/wp-content/uploads/2022/04/avatar-placeholder.gif"
-                                  alt={`${searchUser.displayName}'s avatar`}
-                                />
-
-                                <div className={styles.userMeta}>
-                                  <span className={styles.displayName}>
-                                    {searchUser.displayName}
-                                  </span>
-                                  <span className={styles.username}>
-                                    @{searchUser.username}
-                                  </span>
-                                </div>
-
-                                <span className={styles.userStatus}>
-                                  {isExisting
-                                    ? 'In group'
-                                    : isSelected
-                                      ? '✓'
-                                      : ''}
-                                </span>
-                              </div>
-                            </button>
-                          );
-                        })
-                      )}
-                    </div>
-
-                    <div className={styles.userSearchActions}>
-                      <button
-                        type="button"
-                        className={styles.userSearchCancel}
-                        onClick={handleCloseUserSearch}
-                      >
-                        Cancel
-                      </button>
-
-                      <button
-                        type="submit"
-                        className={styles.userSearchSubmit}
-                        disabled={selectedUsers.length === 0 || isAddingUsers}
-                      >
-                        {isAddingUsers ? 'Adding...' : 'Add Selected Users'}
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
           </div>
+        ) : (
+          <div className={styles.headerLeft} />
         )}
 
         <h2 className={styles.chatTitle}>{chatDisplayTitle}</h2>
@@ -614,91 +632,27 @@ export default function Chat() {
         <div className={styles.topBarRight}>
           {chat?.type === 'GROUP' && (
             <FaUsers
-              className={styles.userList}
+              className={styles.headerIcon}
               onClick={handleOpenUsersModal}
             />
           )}
 
-          {showUsersModal && (
-            <div
-              className={styles.userSearchOverlay}
-              onClick={handleCloseUsersModal}
-            >
-              <div
-                className={styles.userSearchModal}
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className={styles.userSearchHeader}>
-                  <h3 className={styles.userSearchTitle}>Group Members</h3>
-                  <FaRegWindowClose
-                    className={styles.userSearchClose}
-                    onClick={handleCloseUsersModal}
-                  />
-                </div>
-
-                <div className={styles.results}>
-                  {groupParticipants.length === 0 ? (
-                    <p className={styles.searchStatus}>No users found.</p>
-                  ) : (
-                    groupParticipants.map((participant) => {
-                      const participantUser = participant.user;
-                      const isMe = participant.userId === user.id;
-
-                      if (!participantUser) return null;
-
-                      return (
-                        <div
-                          key={participant.userId}
-                          className={styles.userButton}
-                        >
-                          <div className={styles.userRow}>
-                            <img
-                              className={styles.userAvatar}
-                              src="https://hwchamber.co.uk/wp-content/uploads/2022/04/avatar-placeholder.gif"
-                              alt={`${participantUser.displayName}'s avatar`}
-                            />
-
-                            <div className={styles.userMeta}>
-                              <span className={styles.displayName}>
-                                {participantUser.displayName}
-                              </span>
-                              <span className={styles.username}>
-                                @{participantUser.username}
-                              </span>
-                            </div>
-
-                            <span className={styles.userStatus}>
-                              {isMe ? 'Me' : ''}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
           <div ref={settingsRef} className={styles.settingsWrapper}>
             <FaGear
-              className={styles.settingsIcon}
+              className={styles.headerIcon}
               onClick={handleSettingsClick}
             />
 
             {showSettings && (
               <div className={styles.settingsDropdown}>
-                <div
-                  className={`${styles.dropdownItem} contains-icon`}
-                  onClick={handleRenameChat}
-                >
+                <div className={styles.dropdownItem} onClick={handleRenameChat}>
                   <FaEdit />
                   Rename Chat
                 </div>
 
                 {chat?.type === 'GROUP' && (
                   <div
-                    className={`${styles.dropdownItem} contains-icon`}
+                    className={styles.dropdownItem}
                     onClick={handleLeaveChat}
                   >
                     <FaArrowRightFromBracket />
@@ -711,17 +665,216 @@ export default function Chat() {
         </div>
       </div>
 
+      {showSearchUser && (
+        <div className={styles.modalOverlay} onClick={handleCloseUserSearch}>
+          <div
+            className={styles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Add Users to Group</h3>
+              <FaRegWindowClose
+                className={styles.modalClose}
+                onClick={handleCloseUserSearch}
+              />
+            </div>
+
+            <form
+              className={styles.modalForm}
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleAddUserToGroup();
+              }}
+            >
+              <label className={styles.label}>
+                Search users
+                <input
+                  className={styles.input}
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by username or display name"
+                />
+              </label>
+
+              {loadingSearchUser && (
+                <p className={styles.searchStatus}>Searching...</p>
+              )}
+
+              {searchErrors && (
+                <p className={styles.searchError}>{searchErrors}</p>
+              )}
+
+              {addUsersError && (
+                <p className={styles.searchError}>{addUsersError}</p>
+              )}
+
+              {selectedUsers.length > 0 && (
+                <div className={styles.selectedSection}>
+                  <h4 className={styles.selectedTitle}>Selected Users</h4>
+
+                  <div className={styles.selectedUsers}>
+                    {selectedUsers.map((selectedUser) => (
+                      <button
+                        key={selectedUser.id}
+                        type="button"
+                        className={styles.selectedChip}
+                        onClick={() => toggleSelectedUser(selectedUser)}
+                      >
+                        {selectedUser.displayName} ✕
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className={styles.results}>
+                {searchResults.length === 0 &&
+                searchTerm.trim() &&
+                !loadingSearchUser ? (
+                  <p className={styles.searchStatus}>No users found.</p>
+                ) : (
+                  searchResults.map((searchUser) => {
+                    const isSelected = selectedUsers.some(
+                      (selectedUser) => selectedUser.id === searchUser.id,
+                    );
+                    const isExisting = existingUserIds.includes(searchUser.id);
+
+                    return (
+                      <button
+                        key={searchUser.id}
+                        type="button"
+                        className={`${styles.userButton} ${
+                          isSelected ? styles.userButtonSelected : ''
+                        } ${isExisting ? styles.userButtonDisabled : ''}`}
+                        onClick={() => {
+                          if (isExisting) return;
+                          toggleSelectedUser(searchUser);
+                        }}
+                        disabled={isExisting}
+                      >
+                        <div className={styles.userRow}>
+                          <img
+                            className={styles.userAvatar}
+                            src={getAvatarSrc(searchUser.profilePictureUrl)}
+                            alt={`${searchUser.displayName}'s avatar`}
+                          />
+
+                          <div className={styles.userMeta}>
+                            <span className={styles.memberDisplayName}>
+                              {searchUser.displayName}
+                            </span>
+                            <span className={styles.memberUsername}>
+                              @{searchUser.username}
+                            </span>
+                          </div>
+
+                          <span className={styles.userStatus}>
+                            {isExisting ? 'In group' : isSelected ? '✓' : ''}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className={styles.modalActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryBtn}
+                  onClick={handleCloseUserSearch}
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className={styles.primaryBtn}
+                  disabled={selectedUsers.length === 0 || isAddingUsers}
+                >
+                  {isAddingUsers ? 'Adding...' : 'Add Selected Users'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showUsersModal && (
+        <div className={styles.modalOverlay} onClick={handleCloseUsersModal}>
+          <div
+            className={styles.modalCard}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.modalHeader}>
+              <h3 className={styles.modalTitle}>Group Members</h3>
+              <FaRegWindowClose
+                className={styles.modalClose}
+                onClick={handleCloseUsersModal}
+              />
+            </div>
+
+            <div className={styles.results}>
+              {groupParticipants.length === 0 ? (
+                <p className={styles.searchStatus}>No users found.</p>
+              ) : (
+                groupParticipants.map((participant) => {
+                  const participantUser = participant.user;
+                  const isMe = participant.userId === user.id;
+
+                  if (!participantUser) return null;
+
+                  return (
+                    <div
+                      key={participant.userId}
+                      className={styles.userButtonStatic}
+                    >
+                      <div className={styles.userRow}>
+                        <img
+                          className={styles.userAvatar}
+                          src={getAvatarSrc(participantUser.profilePictureUrl)}
+                          alt={`${participantUser.displayName}'s avatar`}
+                        />
+
+                        <div className={styles.userMeta}>
+                          <span className={styles.memberDisplayName}>
+                            {participantUser.displayName}
+                          </span>
+                          <span className={styles.memberUsername}>
+                            @{participantUser.username}
+                          </span>
+                        </div>
+
+                        <span className={styles.userStatus}>
+                          {isMe ? 'Me' : ''}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {showTitleForm && (
-        <div className={styles.titleFormOverlay}>
-          <form className={styles.titleForm} onSubmit={handleTitleFormSubmit}>
+        <div className={styles.modalOverlay} onClick={handleCloseTitleForm}>
+          <form
+            className={styles.titleForm}
+            onSubmit={handleTitleFormSubmit}
+            onClick={(e) => e.stopPropagation()}
+          >
             <FaRegWindowClose
-              className={styles.titleFormClose}
+              className={styles.modalClose}
               onClick={handleCloseTitleForm}
             />
 
-            <label>
+            <label className={styles.label}>
               New Chat Name
               <input
+                className={styles.input}
                 type="text"
                 name="title"
                 id="title"
@@ -730,11 +883,17 @@ export default function Chat() {
               />
             </label>
 
-            <button type="submit" disabled={newTitleLoading}>
+            <button
+              className={styles.primaryBtn}
+              type="submit"
+              disabled={newTitleLoading}
+            >
               {newTitleLoading ? 'Updating...' : 'Update'}
             </button>
 
-            {newTitleError && <p>{newTitleError}</p>}
+            {newTitleError && (
+              <p className={styles.searchError}>{newTitleError}</p>
+            )}
           </form>
         </div>
       )}
@@ -762,13 +921,17 @@ export default function Chat() {
                     {!isOwn && (
                       <img
                         className={styles.messageAvatar}
-                        src="https://hwchamber.co.uk/wp-content/uploads/2022/04/avatar-placeholder.gif"
+                        src={getAvatarSrc(msg.sender.profilePictureUrl)}
                         alt={`${msg.sender.displayName}'s avatar`}
                       />
                     )}
 
                     <div className={styles.messageBubble}>
-                      <p className={styles.messageContent}>{msg.content}</p>
+                      {renderAttachment(msg)}
+
+                      {msg.content ? (
+                        <p className={styles.messageContent}>{msg.content}</p>
+                      ) : null}
 
                       <div className={styles.messageMeta}>
                         <span className={styles.senderName}>
@@ -793,8 +956,52 @@ export default function Chat() {
             handleSend();
           }}
         >
+          {selectedAttachment && (
+            <div className={styles.attachmentPreviewBar}>
+              <div className={styles.attachmentPreviewMeta}>
+                {attachmentPreviewUrl ? (
+                  <img
+                    src={attachmentPreviewUrl}
+                    alt="attachment preview"
+                    className={styles.attachmentPreviewImage}
+                  />
+                ) : (
+                  <div className={styles.attachmentPreviewFileIcon}>FILE</div>
+                )}
+
+                <div className={styles.attachmentPreviewText}>
+                  <span className={styles.attachmentPreviewName}>
+                    {selectedAttachment.name}
+                  </span>
+                  <span className={styles.attachmentPreviewSize}>
+                    {formatBytes(selectedAttachment.size)}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                className={styles.removeAttachmentBtn}
+                onClick={resetAttachmentState}
+              >
+                Remove
+              </button>
+            </div>
+          )}
+
           <div className={styles.inputBar}>
-            <button className={styles.attachmentBtn} type="button">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className={styles.hiddenFileInput}
+              onChange={handleAttachmentChange}
+            />
+
+            <button
+              className={styles.attachmentBtn}
+              type="button"
+              onClick={handleAttachmentButtonClick}
+            >
               <FaPlus />
             </button>
 
