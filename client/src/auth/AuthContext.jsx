@@ -1,4 +1,11 @@
-import { createContext, useContext, useState, useCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+} from 'react';
+import { connectSocket, disconnectSocket } from '../socket';
 
 const AuthContext = createContext(null);
 
@@ -13,6 +20,14 @@ export function AuthProvider({ children }) {
   });
 
   const apiUrl = import.meta.env.VITE_API_URL;
+
+  useEffect(() => {
+    if (token) {
+      connectSocket(token);
+    } else {
+      disconnectSocket();
+    }
+  }, [token]);
 
   const login = useCallback((data) => {
     setUser(data.user);
@@ -33,6 +48,8 @@ export function AuthProvider({ children }) {
 
     localStorage.removeItem('user');
     localStorage.removeItem('accessToken');
+
+    disconnectSocket();
   }, []);
 
   const verify = useCallback(async () => {
