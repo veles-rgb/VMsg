@@ -4,9 +4,7 @@ const { requireAuth } = require("../middleware/requireAuth");
 // Auth controller
 const controller = require('../controllers/auth.js');
 
-router.get('/verify', requireAuth, (req, res) => {
-    return res.json({ ok: true, user: req.user });
-});
+router.get('/verify', requireAuth, controller.verify);
 router.post('/register', controller.createUser);
 router.post("/login", controller.loginUser);
 
