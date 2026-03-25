@@ -3,6 +3,33 @@ const jwt = require("jsonwebtoken");
 
 const { prisma } = require('../../lib/prisma.mjs');
 
+async function verify(req, res, next) {
+    try {
+        const dbUser = await prisma.user.findUnique({
+            where: {
+                id: req.user.id,
+            },
+            select: {
+                id: true,
+                username: true,
+                displayName: true,
+                profilePictureUrl: true,
+            },
+        });
+
+        if (!dbUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        return res.status(200).json({
+            ok: true,
+            user: dbUser,
+        });
+    } catch (err) {
+        return next(err);
+    }
+}
+
 async function createUser(req, res, next) {
     try {
         const { username, displayName, password } = req.body;
@@ -80,6 +107,7 @@ async function loginUser(req, res, next) {
 }
 
 module.exports = {
+    verify,
     createUser,
     loginUser
 };
