@@ -1,75 +1,71 @@
 .main {
     height: 100vh;
+    width: 100%;
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    padding-bottom: 1rem;
+    padding: 0;
     box-sizing: border-box;
 }
 
 .chatContainer {
-    width: min(1200px, 100%);
+    width: 100%;
     height: 100%;
     display: flex;
     flex-direction: column;
     min-height: 0;
 }
 
-.contains-icon {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-}
-
 .mainHeader {
     width: 100%;
     display: grid;
-    grid-template-columns: auto 1fr auto auto;
+    grid-template-columns: 40px 1fr auto;
     align-items: center;
+    gap: 1rem;
     border-bottom: 1px solid var(--color-border);
     padding: 1rem;
     background-color: var(--color-bg-secondary);
     color: white;
+    box-sizing: border-box;
+    flex: 0 0 auto;
+}
+
+.headerLeft {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-width: 0;
 }
 
 .chatTitle {
-    grid-column: 2;
-    text-align: center;
     margin: 0;
-}
-
-.settingsIcon {
-    grid-column: 4;
-    justify-self: end;
-    cursor: pointer;
-    color: white;
-}
-
-.userList {
-    grid-column: 3;
-    justify-self: end;
-    cursor: pointer;
-    color: white;
+    text-align: center;
+    font-size: 1.2rem;
+    min-width: 0;
 }
 
 .topBarRight {
     display: flex;
+    align-items: center;
     gap: 1rem;
 }
 
-.addUser {
-    grid-column: 1;
-    justify-self: start;
+.headerIcon {
     cursor: pointer;
     color: white;
+    font-size: 1.1rem;
+}
+
+.headerIcon:hover {
+    opacity: 0.8;
 }
 
 .chat {
     flex: 1;
     min-height: 0;
     overflow-y: auto;
-    padding: 0.5rem 0.5rem;
+    padding: 0.75rem 0.5rem;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .messagesInner {
@@ -110,7 +106,7 @@
     border-radius: 1rem;
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
+    gap: 0.5rem;
     word-break: break-word;
     box-sizing: border-box;
 }
@@ -118,13 +114,13 @@
 .otherMessage .messageBubble {
     background: #f1f1f1;
     color: #111;
-    border-bottom-left-radius: 0.3rem;
+    border-bottom-left-radius: 0.35rem;
 }
 
 .ownMessage .messageBubble {
     background: #6b46c1;
     color: white;
-    border-top-right-radius: 0.3rem;
+    border-top-right-radius: 0.35rem;
 }
 
 .messageContent {
@@ -151,19 +147,131 @@
     font-style: italic;
 }
 
-.msgForm {
-    margin-top: auto;
-    display: flex;
-    justify-content: center;
+.messageImage {
+    display: block;
     width: 100%;
+    max-width: 260px;
+    border-radius: 0.9rem;
+    object-fit: cover;
+}
+
+.messageVideo {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    border-radius: 0.9rem;
+    background: black;
+}
+
+.messageFile {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    text-decoration: none;
+    color: inherit;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    border-radius: 0.85rem;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.otherMessage .messageFile {
+    border-color: rgba(0, 0, 0, 0.12);
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.messageFileName {
+    font-weight: 700;
+    word-break: break-word;
+}
+
+.messageFileSize {
+    font-size: 0.82rem;
+    opacity: 0.8;
+}
+
+.msgForm {
     flex: 0 0 auto;
-    margin-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    width: min(900px, 100%);
+    margin: 0 auto;
+    gap: 0.65rem;
+    padding: 0 0.5rem 0.75rem;
+    box-sizing: border-box;
+}
+
+.attachmentPreviewBar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    background: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    padding: 0.75rem 0.9rem;
+}
+
+.attachmentPreviewMeta {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-width: 0;
+}
+
+.attachmentPreviewImage {
+    width: 52px;
+    height: 52px;
+    border-radius: 0.8rem;
+    object-fit: cover;
+    flex: 0 0 52px;
+}
+
+.attachmentPreviewFileIcon {
+    width: 52px;
+    height: 52px;
+    border-radius: 0.8rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #2b2b2b;
+    color: white;
+    font-size: 0.72rem;
+    font-weight: 700;
+    flex: 0 0 52px;
+}
+
+.attachmentPreviewText {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    min-width: 0;
+}
+
+.attachmentPreviewName {
+    font-weight: 700;
+    word-break: break-word;
+}
+
+.attachmentPreviewSize {
+    font-size: 0.85rem;
+    opacity: 0.75;
+}
+
+.removeAttachmentBtn {
+    border: none;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-primary);
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.8rem;
+    cursor: pointer;
+    flex: 0 0 auto;
 }
 
 .inputBar {
     display: flex;
     align-items: center;
-    width: min(900px, 100%);
+    width: 100%;
     background: #fff;
     border: 1px solid var(--color-border);
     border-radius: 1rem;
@@ -172,13 +280,17 @@
     box-sizing: border-box;
 }
 
+.hiddenFileInput {
+    display: none;
+}
+
 .textarea {
     resize: none;
     width: 100%;
     border: none;
     outline: none;
     background: transparent;
-    font-size: 1.1rem;
+    font-size: 1.05rem;
     line-height: 1.4;
     padding: 0.75rem 0;
     min-height: calc(1.4em + 0.25rem);
@@ -218,7 +330,8 @@
 }
 
 .sendBtn:hover,
-.attachmentBtn:hover {
+.attachmentBtn:hover,
+.removeAttachmentBtn:hover {
     background: rgba(0, 0, 0, 0.08);
 }
 
@@ -235,34 +348,23 @@
     position: absolute;
     right: 0;
     top: 35px;
-
     background: white;
     border: 1px solid var(--color-border);
     border-radius: 8px;
-
     display: flex;
     flex-direction: column;
-    min-width: 150px;
-
+    min-width: 170px;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
-    z-index: 10;
+    z-index: 20;
 }
 
 .dropdownItem {
     color: black;
     padding: 10px 14px;
     cursor: pointer;
-    border-radius: 8px;
-}
-
-.dropdownItem:first-child {
-    border-top-left-radius: 8px;
-    border-top-right-radius: 8px;
-}
-
-.dropdownItem:last-child {
-    border-bottom-left-radius: 8px;
-    border-bottom-right-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
 }
 
 .dropdownItem:not(:last-child) {
@@ -273,54 +375,7 @@
     background: #f4f4f4;
 }
 
-.titleFormOverlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.titleForm {
-    background-color: var(--color-bg-secondary);
-    padding: 2rem;
-    position: relative;
-}
-
-.titleFormClose {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    cursor: pointer;
-    font-size: 1.4rem;
-}
-
-.titleFormClose:hover {
-    cursor: pointer;
-    opacity: 0.7;
-}
-
-.addUserWrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.addUser {
-    cursor: pointer;
-    font-size: 1.15rem;
-}
-
-.addUser:hover {
-    opacity: 0.8;
-}
-
-.userSearchOverlay {
+.modalOverlay {
     position: fixed;
     inset: 0;
     background: rgba(0, 0, 0, 0.68);
@@ -332,7 +387,7 @@
     box-sizing: border-box;
 }
 
-.userSearchModal {
+.modalCard {
     width: min(640px, 100%);
     max-height: 85vh;
     overflow: hidden;
@@ -344,7 +399,7 @@
     box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
 }
 
-.userSearchHeader {
+.modalHeader {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -352,27 +407,39 @@
     border-bottom: 1px solid var(--color-border);
 }
 
-.userSearchTitle {
+.modalTitle {
     margin: 0;
     font-size: 1.15rem;
 }
 
-.userSearchClose {
+.modalClose {
     cursor: pointer;
     font-size: 1.2rem;
     flex: 0 0 auto;
 }
 
-.userSearchClose:hover {
+.modalClose:hover {
     opacity: 0.75;
 }
 
-.userSearchForm {
+.modalForm {
     display: flex;
     flex-direction: column;
     gap: 1rem;
     padding: 1rem 1.25rem 1.25rem;
     min-height: 0;
+}
+
+.titleForm {
+    width: min(440px, 100%);
+    background-color: var(--color-bg-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 1rem;
+    padding: 1.25rem;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .label {
@@ -443,10 +510,11 @@
     gap: 0.65rem;
     max-height: 280px;
     overflow-y: auto;
-    padding-right: 0.2rem;
+    padding: 1rem 1.25rem 1.25rem;
 }
 
-.userButton {
+.userButton,
+.userButtonStatic {
     width: 100%;
     border: 1px solid var(--color-border);
     background: rgba(255, 255, 255, 0.04);
@@ -454,6 +522,10 @@
     border-radius: 0.9rem;
     padding: 0.85rem 0.95rem;
     text-align: left;
+    box-sizing: border-box;
+}
+
+.userButton {
     cursor: pointer;
     transition: background 0.15s ease, transform 0.15s ease;
 }
@@ -469,6 +541,16 @@
 .userButtonSelected {
     background: rgba(255, 255, 255, 0.12);
     border-color: var(--color-primary-light);
+}
+
+.userButtonDisabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.userButtonDisabled:hover {
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .userRow {
@@ -493,30 +575,31 @@
     flex: 1;
 }
 
-.displayName {
+.memberDisplayName {
     font-weight: 700;
 }
 
-.username {
+.memberUsername {
     color: var(--color-text-secondary);
     font-size: 0.92rem;
 }
 
-.userCheck {
-    font-weight: 700;
-    font-size: 1rem;
+.userStatus {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
     flex: 0 0 auto;
 }
 
-.userSearchActions {
+.modalActions {
     display: flex;
     justify-content: flex-end;
     gap: 0.75rem;
-    padding-top: 0.25rem;
+    padding: 0 1.25rem 1.25rem;
 }
 
-.userSearchCancel,
-.userSearchSubmit {
+.secondaryBtn,
+.primaryBtn {
     border: none;
     border-radius: 0.9rem;
     padding: 0.85rem 1rem;
@@ -524,37 +607,37 @@
     cursor: pointer;
 }
 
-.userSearchCancel {
+.secondaryBtn {
     background: rgba(255, 255, 255, 0.1);
     color: var(--color-text-primary);
 }
 
-.userSearchSubmit {
+.primaryBtn {
     background: var(--color-primary);
     color: white;
 }
 
-.userSearchSubmit:disabled {
+.primaryBtn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
 }
 
-.userButtonDisabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    background: rgba(255, 255, 255, 0.05);
-}
+@media (max-width: 768px) {
+    .mainHeader {
+        grid-template-columns: 32px 1fr auto;
+        gap: 0.75rem;
+    }
 
-.userButtonDisabled:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
+    .messageBubble {
+        max-width: min(82%, 520px);
+    }
 
-.userStatus {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--color-text-secondary);
-}
+    .attachmentPreviewBar {
+        flex-direction: column;
+        align-items: stretch;
+    }
 
-.userSearchModal {
-    padding: 20px;
+    .removeAttachmentBtn {
+        width: 100%;
+    }
 }
