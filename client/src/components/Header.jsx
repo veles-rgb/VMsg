@@ -75,7 +75,7 @@ export default function Header() {
   }
 
   function handleUserCardClick() {
-    console.log('Card clicked');
+    navigate('/me');
   }
 
   function handleOptionsCLick() {
