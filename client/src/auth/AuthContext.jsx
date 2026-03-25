@@ -22,6 +22,11 @@ export function AuthProvider({ children }) {
     localStorage.setItem('accessToken', data.accessToken);
   }, []);
 
+  const updateUser = useCallback((nextUser) => {
+    setUser(nextUser);
+    localStorage.setItem('user', JSON.stringify(nextUser));
+  }, []);
+
   const logout = useCallback(() => {
     setUser(null);
     setToken(null);
@@ -33,25 +38,41 @@ export function AuthProvider({ children }) {
   const verify = useCallback(async () => {
     if (!token) return false;
 
-    const res = await fetch(`${apiUrl}/auth/verify`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    try {
+      const res = await fetch(`${apiUrl}/auth/verify`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
-    if (!res.ok) {
+      if (!res.ok) {
+        logout();
+        return false;
+      }
+
+      const data = await res.json();
+
+      setUser(data.user);
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      return true;
+    } catch {
       logout();
       return false;
     }
-
-    const data = await res.json();
-    setUser(data.user);
-
-    return true;
   }, [token, apiUrl, logout]);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, verify }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        login,
+        logout,
+        verify,
+        updateUser,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );
