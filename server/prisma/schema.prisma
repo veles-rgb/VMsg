@@ -45,10 +45,12 @@ model Chat {
 }
 
 model ChatParticipant {
-  chatId   String   @db.Uuid
-  userId   String   @db.Uuid
-  joinedAt DateTime @default(now())
-  leftAt   DateTime?
+  chatId      String   @db.Uuid
+  userId      String   @db.Uuid
+  joinedAt    DateTime @default(now())
+  leftAt      DateTime?
+  hiddenAt    DateTime?
+  unreadCount Int      @default(0)
 
   chat Chat @relation(fields: [chatId], references: [id])
   user User @relation(fields: [userId], references: [id])
@@ -58,14 +60,21 @@ model ChatParticipant {
 }
 
 model Message {
-  id           String   @id @default(uuid()) @db.Uuid
-  chatId       String   @db.Uuid
-  senderUserId String   @db.Uuid
-  content      String
-  sentAt       DateTime @default(now())
+  id                 String    @id @default(uuid()) @db.Uuid
+  chatId             String    @db.Uuid
+  senderUserId       String    @db.Uuid
+  content            String?
+  sentAt             DateTime  @default(now())
+
+  attachmentUrl      String?
+  attachmentPublicId String?
+  attachmentType     String?
+  attachmentName     String?
+  attachmentBytes    Int?
 
   chat   Chat @relation(fields: [chatId], references: [id])
   sender User @relation(fields: [senderUserId], references: [id])
 
   @@index([chatId, sentAt])
+  @@index([senderUserId])
 }
