@@ -4,7 +4,13 @@ import { useAuth } from '../auth/AuthContext';
 import { getSocket } from '../socket';
 import styles from './styles/Home.module.css';
 
-import { FaUser, FaUsers, FaComments } from 'react-icons/fa';
+import {
+  FaUser,
+  FaUsers,
+  FaComments,
+  FaBolt,
+  FaArrowRight,
+} from 'react-icons/fa';
 import { HiAtSymbol } from 'react-icons/hi';
 
 const DEFAULT_AVATAR =
@@ -42,15 +48,15 @@ export default function Home() {
         return;
       }
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(
           data?.error || data?.message || `Something went wrong: ${res.status}`,
         );
       }
 
-      const data = await res.json();
-      setOnlineUsers(data.users || []);
+      setOnlineUsers(data?.users || []);
     } catch (err) {
       setOnlineUsersError(err.message || 'Something went wrong');
     } finally {
@@ -58,14 +64,12 @@ export default function Home() {
     }
   }, [apiUrl, token, logout]);
 
-  // initial load
   useEffect(() => {
     if (!token || !user) return;
     setOnlineUsersLoading(true);
     fetchOnlineUsers();
   }, [fetchOnlineUsers, token, user]);
 
-  // SOCKET REALTIME UPDATE
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;
@@ -97,14 +101,14 @@ export default function Home() {
         }),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(
           data?.message || data?.error || `Something went wrong: ${res.status}`,
         );
       }
 
-      const data = await res.json();
       navigate(`/chat/${data.chatId}`);
     } catch (err) {
       setChatError(err.message || 'Something went wrong');
@@ -114,55 +118,121 @@ export default function Home() {
   }
 
   const filteredUsers = useMemo(
-    () => onlineUsers.filter((u) => u.id !== user?.id),
+    () => onlineUsers.filter((onlineUser) => onlineUser.id !== user?.id),
     [onlineUsers, user?.id],
   );
 
   const activeUsersCount = filteredUsers.length;
+  const featuredUsers = filteredUsers.slice(0, 3);
+  const heroTitle = user?.displayName
+    ? `Welcome back, ${user.displayName}`
+    : 'Welcome back';
 
   return (
     <main className={styles.main}>
       <div className={styles.mainHeader}>
         <div className={styles.headerInner}>
-          <h1 className={styles.headerTitle}>Home</h1>
+          <div className={styles.headerBadge}>Home</div>
+          <h1 className={styles.headerTitle}>{heroTitle}</h1>
           <p className={styles.headerSubtitle}>
-            Welcome back{user?.displayName ? `, ${user.displayName}` : ''}. See
-            who is online and jump straight into a conversation.
+            Start a conversation, see who is around, and jump back into VMsg.
           </p>
         </div>
       </div>
 
       <div className={styles.pageContent}>
         <section className={styles.heroCard}>
-          <div className={styles.heroText}>
-            <h2 className={styles.heroTitle}>Online users</h2>
-            <p className={styles.heroDescription}>
-              Click any active user below to start chatting instantly.
-            </p>
-          </div>
-
-          <div className={styles.statsGrid}>
-            <div className={styles.statCard}>
-              <div className={styles.statIconWrap}>
-                <FaUsers className={styles.statIcon} />
-              </div>
-
-              <div className={styles.statInfo}>
-                <span className={styles.statLabel}>Active users</span>
-                <strong className={styles.statValue}>{activeUsersCount}</strong>
-              </div>
+          <div className={styles.heroLeft}>
+            <div className={styles.heroCopy}>
+              <span className={styles.heroEyebrow}>Your messaging hub</span>
+              <h2 className={styles.heroTitle}>Chat it up!</h2>
+              <p className={styles.heroDescription}>
+                Browse who is online right now and open a DM instantly.
+              </p>
             </div>
 
-            <div className={styles.statCard}>
-              <div className={styles.statIconWrap}>
-                <FaComments className={styles.statIcon} />
+            <div className={styles.heroStats}>
+              <div className={styles.statCard}>
+                <div className={styles.statIconWrap}>
+                  <FaUsers className={styles.statIcon} />
+                </div>
+                <div className={styles.statInfo}>
+                  <span className={styles.statLabel}>Users online</span>
+                  <strong className={styles.statValue}>
+                    {activeUsersCount}
+                  </strong>
+                </div>
               </div>
 
-              <div className={styles.statInfo}>
-                <span className={styles.statLabel}>Chat status</span>
-                <strong className={styles.statValue}>
-                  {loadingChat ? 'Opening...' : 'Ready'}
-                </strong>
+              <div className={styles.statCard}>
+                <div className={styles.statIconWrap}>
+                  <FaComments className={styles.statIcon} />
+                </div>
+                <div className={styles.statInfo}>
+                  <span className={styles.statLabel}>Available DMs</span>
+                  <strong className={styles.statValue}>
+                    {activeUsersCount > 0 ? activeUsersCount : 0}
+                  </strong>
+                </div>
+              </div>
+
+              <div className={styles.statCard}>
+                <div className={styles.statIconWrap}>
+                  <HiAtSymbol className={styles.statIcon} />
+                </div>
+                <div className={styles.statInfo}>
+                  <span className={styles.statLabel}>Your username</span>
+                  <strong className={styles.statValue}>
+                    @{user?.username}
+                  </strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.heroRight}>
+            <div className={styles.quickCard}>
+              <div className={styles.quickCardHeader}>
+                <FaBolt className={styles.quickCardIcon} />
+                <span className={styles.quickCardTitle}>Quick start</span>
+              </div>
+
+              <p className={styles.quickCardText}>
+                Pick someone from the online list below to start chatting
+                immediately.
+              </p>
+
+              <div className={styles.featuredList}>
+                {featuredUsers.length === 0 ? (
+                  <div className={styles.featuredEmpty}>
+                    No one else is online right now.
+                  </div>
+                ) : (
+                  featuredUsers.map((featuredUser) => (
+                    <button
+                      key={featuredUser.id}
+                      type="button"
+                      className={styles.featuredUser}
+                      onClick={() => handleUserClick(featuredUser)}
+                      disabled={loadingChat}
+                    >
+                      <img
+                        className={styles.featuredAvatar}
+                        src={getAvatarSrc(featuredUser.profilePictureUrl)}
+                        alt={`${featuredUser.displayName}'s avatar`}
+                      />
+                      <div className={styles.featuredMeta}>
+                        <span className={styles.featuredName}>
+                          {featuredUser.displayName}
+                        </span>
+                        <span className={styles.featuredUsername}>
+                          @{featuredUser.username}
+                        </span>
+                      </div>
+                      <FaArrowRight className={styles.featuredArrow} />
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           </div>
@@ -176,16 +246,27 @@ export default function Home() {
 
         {onlineUsersLoading ? (
           <section className={styles.stateCard}>
-            <h3 className={styles.stateTitle}>Loading users...</h3>
+            <h3 className={styles.stateTitle}>Loading your home feed...</h3>
+            <p className={styles.stateText}>
+              Pulling the latest online users now.
+            </p>
           </section>
         ) : filteredUsers.length === 0 ? (
           <section className={styles.stateCard}>
             <h3 className={styles.stateTitle}>No users online right now</h3>
+            <p className={styles.stateText}>
+              Check back in a bit, or wait for someone else to come online.
+            </p>
           </section>
         ) : (
           <section className={styles.listSection}>
             <div className={styles.sectionHeader}>
-              <h2 className={styles.sectionTitle}>Online now</h2>
+              <div>
+                <h2 className={styles.sectionTitle}>Online now</h2>
+                <p className={styles.sectionSubtitle}>
+                  Click any user below to open a direct message.
+                </p>
+              </div>
               <span className={styles.sectionCount}>
                 {activeUsersCount} {activeUsersCount === 1 ? 'user' : 'users'}
               </span>
@@ -204,7 +285,7 @@ export default function Home() {
                     <img
                       className={styles.avatar}
                       src={getAvatarSrc(onlineUser?.profilePictureUrl)}
-                      alt="avatar"
+                      alt={`${onlineUser.displayName}'s avatar`}
                     />
 
                     <div className={styles.userMeta}>
@@ -225,10 +306,14 @@ export default function Home() {
                   </div>
 
                   <div className={styles.userBottom}>
-                    <span className={styles.onlineDot} />
-                    <span className={styles.onlineText}>Online</span>
+                    <div className={styles.presence}>
+                      <span className={styles.onlineDot} />
+                      <span className={styles.onlineText}>Online now</span>
+                    </div>
 
-                    <span className={styles.messagePill}>Message</span>
+                    <span className={styles.messagePill}>
+                      {loadingChat ? 'Opening...' : 'Message'}
+                    </span>
                   </div>
                 </button>
               ))}
