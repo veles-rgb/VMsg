@@ -173,9 +173,40 @@ async function updateDisplayName(req, res, next) {
     }
 }
 
+async function getUserInfoByUsername(req, res, next) {
+    try {
+        const { username } = req.params;
+
+        if (!username || !username.trim()) {
+            return res.status(400).json({ message: 'Username is required' });
+        }
+
+        const user = await prisma.user.findUnique({
+            where: {
+                username: username.trim(),
+            },
+            select: {
+                id: true,
+                displayName: true,
+                username: true,
+                createdAt: true,
+            },
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        return res.status(200).json({ user });
+    } catch (error) {
+        return next(error);
+    }
+}
+
 module.exports = {
     getOnlineUsers,
     searchUsers,
     uploadProfilePicture,
     updateDisplayName,
+    getUserInfoByUsername,
 };
