@@ -12,6 +12,7 @@ import {
   FaArrowRight,
 } from 'react-icons/fa';
 import { HiAtSymbol } from 'react-icons/hi';
+import { FaMessage } from 'react-icons/fa6';
 
 const DEFAULT_AVATAR =
   'https://simplyilm.com/wp-content/uploads/2017/08/temporary-profile-placeholder-1.jpg';
@@ -117,6 +118,10 @@ export default function Home() {
     }
   }
 
+  function handleProfileClick(user) {
+    navigate(`/user/${user.username}`);
+  }
+
   const filteredUsers = useMemo(
     () => onlineUsers.filter((onlineUser) => onlineUser.id !== user?.id),
     [onlineUsers, user?.id],
@@ -209,17 +214,15 @@ export default function Home() {
                   </div>
                 ) : (
                   featuredUsers.map((featuredUser) => (
-                    <button
+                    <div
                       key={featuredUser.id}
-                      type="button"
                       className={styles.featuredUser}
-                      onClick={() => handleUserClick(featuredUser)}
-                      disabled={loadingChat}
+                      onClick={() => handleProfileClick(featuredUser)}
                     >
                       <img
                         className={styles.featuredAvatar}
                         src={getAvatarSrc(featuredUser.profilePictureUrl)}
-                        alt={`${featuredUser.displayName}'s avatar`}
+                        alt=""
                       />
                       <div className={styles.featuredMeta}>
                         <span className={styles.featuredName}>
@@ -229,8 +232,16 @@ export default function Home() {
                           @{featuredUser.username}
                         </span>
                       </div>
-                      <FaArrowRight className={styles.featuredArrow} />
-                    </button>
+                      <button
+                        className={styles.featuredArrow}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUserClick(featuredUser);
+                        }}
+                      >
+                        <FaMessage />
+                      </button>
+                    </div>
                   ))
                 )}
               </div>
@@ -264,7 +275,7 @@ export default function Home() {
               <div>
                 <h2 className={styles.sectionTitle}>Online now</h2>
                 <p className={styles.sectionSubtitle}>
-                  Click any user below to open a direct message.
+                  Click a user to view profile or message them.
                 </p>
               </div>
               <span className={styles.sectionCount}>
@@ -274,18 +285,16 @@ export default function Home() {
 
             <div className={styles.usersGrid}>
               {filteredUsers.map((onlineUser) => (
-                <button
+                <div
                   key={onlineUser.id}
-                  type="button"
                   className={styles.userCard}
-                  onClick={() => handleUserClick(onlineUser)}
-                  disabled={loadingChat}
+                  onClick={() => handleProfileClick(onlineUser)}
                 >
                   <div className={styles.userTop}>
                     <img
                       className={styles.avatar}
                       src={getAvatarSrc(onlineUser?.profilePictureUrl)}
-                      alt={`${onlineUser.displayName}'s avatar`}
+                      alt=""
                     />
 
                     <div className={styles.userMeta}>
@@ -311,11 +320,18 @@ export default function Home() {
                       <span className={styles.onlineText}>Online now</span>
                     </div>
 
-                    <span className={styles.messagePill}>
+                    <button
+                      className={styles.messagePill}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUserClick(onlineUser);
+                      }}
+                      disabled={loadingChat}
+                    >
                       {loadingChat ? 'Opening...' : 'Message'}
-                    </span>
+                    </button>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </section>
