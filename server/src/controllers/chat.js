@@ -1,5 +1,15 @@
 const { prisma } = require('../../lib/prisma.mjs');
 const { emitToUsers, emitToChat } = require('../socket');
+const createSystemMessage = require('../utils/createSystemMessage');
+
+function formatUserList(users) {
+    const names = users.map((user) => user.displayName);
+
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return `${names[0]} and ${names[1]}`;
+
+    return `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+}
 
 async function createDm(req, res, next) {
     try {
@@ -123,16 +133,31 @@ async function createGroup(req, res, next) {
             return res.status(400).json({ error: 'At least one other user must be selected' });
         }
 
-        const validUsers = await prisma.user.findMany({
-            where: {
-                id: {
-                    in: uniqueParticipantIds,
+        const [creator, validUsers] = await Promise.all([
+            prisma.user.findUnique({
+                where: {
+                    id: createdByUserId,
                 },
-            },
-            select: {
-                id: true,
-            },
-        });
+                select: {
+                    id: true,
+                    displayName: true,
+                },
+            }),
+            prisma.user.findMany({
+                where: {
+                    id: {
+                        in: uniqueParticipantIds,
+                    },
+                },
+                select: {
+                    id: true,
+                },
+            }),
+        ]);
+
+        if (!creator) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
         if (validUsers.length !== uniqueParticipantIds.length) {
             return res.status(400).json({ error: 'One or more selected users do not exist' });
@@ -146,6 +171,7 @@ async function createGroup(req, res, next) {
             },
             select: {
                 id: true,
+                title: true,
             },
         });
 
@@ -164,8 +190,10 @@ async function createGroup(req, res, next) {
             ],
         });
 
-        emitToUsers([createdByUserId, ...uniqueParticipantIds], 'sidebar:refresh', {
+        await createSystemMessage({
             chatId: chat.id,
+            content: `${creator.displayName} created the group`,
+            actorUserId: createdByUserId,
         });
 
         return res.status(201).json({ chatId: chat.id });
@@ -327,6 +355,7 @@ async function getChatMessages(req, res, next) {
                 id: true,
                 content: true,
                 sentAt: true,
+                type: true,
                 attachmentUrl: true,
                 attachmentPublicId: true,
                 attachmentType: true,
@@ -392,11 +421,15 @@ async function sendChatMsg(req, res, next) {
             return res.status(404).json({ error: 'Chat not found' });
         }
 
+        const sentAt = new Date();
+
         const message = await prisma.message.create({
             data: {
                 chatId,
                 senderUserId,
                 content: trimmedContent,
+                type: 'USER',
+                sentAt,
                 attachmentUrl: attachmentUrl || null,
                 attachmentPublicId: attachmentPublicId || null,
                 attachmentType: attachmentType || null,
@@ -457,7 +490,7 @@ async function sendChatMsg(req, res, next) {
                 id: chatId,
             },
             data: {
-                lastMessageAt: new Date(),
+                lastMessageAt: sentAt,
             },
         });
 
@@ -565,42 +598,47 @@ async function addToGroup(req, res, next) {
             return res.status(400).json({ error: 'There must be at least one user selected' });
         }
 
-        const chat = await prisma.chat.findFirst({
-            where: {
-                id: chatId,
-                type: 'GROUP',
-                participants: {
-                    some: {
-                        userId: currentUserId,
-                        leftAt: null,
+        const [actor, chat] = await Promise.all([
+            prisma.user.findUnique({
+                where: {
+                    id: currentUserId,
+                },
+                select: {
+                    id: true,
+                    displayName: true,
+                },
+            }),
+            prisma.chat.findFirst({
+                where: {
+                    id: chatId,
+                    type: 'GROUP',
+                    participants: {
+                        some: {
+                            userId: currentUserId,
+                            leftAt: null,
+                        },
                     },
                 },
-            },
-            select: {
-                id: true,
-                participants: {
-                    where: {
-                        leftAt: null,
-                    },
-                    select: {
-                        userId: true,
-                    },
+                select: {
+                    id: true,
                 },
-            },
-        });
+            }),
+        ]);
+
+        if (!actor) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
         if (!chat) {
             return res.status(404).json({ error: 'Group chat not found' });
         }
 
-        const existingUserIds = chat.participants.map((p) => p.userId);
-
         const uniqueParticipantIds = [...new Set(participants)].filter(
-            (id) => id && !existingUserIds.includes(id)
+            (id) => id && id !== currentUserId
         );
 
         if (uniqueParticipantIds.length === 0) {
-            return res.status(400).json({ error: 'All selected users are already in the group' });
+            return res.status(400).json({ error: 'There must be at least one valid user selected' });
         }
 
         const validUsers = await prisma.user.findMany({
@@ -611,6 +649,7 @@ async function addToGroup(req, res, next) {
             },
             select: {
                 id: true,
+                displayName: true,
             },
         });
 
@@ -618,29 +657,82 @@ async function addToGroup(req, res, next) {
             return res.status(400).json({ error: 'One or more selected users do not exist' });
         }
 
-        await prisma.chatParticipant.createMany({
-            data: uniqueParticipantIds.map((userId) => ({
-                chatId,
-                userId,
-                unreadCount: 0,
-            })),
-        });
-
-        const activeParticipants = await prisma.chatParticipant.findMany({
+        const existingParticipants = await prisma.chatParticipant.findMany({
             where: {
                 chatId,
-                leftAt: null,
+                userId: {
+                    in: uniqueParticipantIds,
+                },
             },
             select: {
                 userId: true,
+                leftAt: true,
             },
         });
 
-        emitToUsers(
-            activeParticipants.map((participant) => participant.userId),
-            'sidebar:refresh',
-            { chatId }
+        const existingMap = new Map(
+            existingParticipants.map((participant) => [participant.userId, participant])
         );
+
+        const userIdsToCreate = [];
+        const userIdsToRestore = [];
+        const alreadyActiveUserIds = [];
+
+        for (const userId of uniqueParticipantIds) {
+            const existingParticipant = existingMap.get(userId);
+
+            if (!existingParticipant) {
+                userIdsToCreate.push(userId);
+                continue;
+            }
+
+            if (existingParticipant.leftAt) {
+                userIdsToRestore.push(userId);
+                continue;
+            }
+
+            alreadyActiveUserIds.push(userId);
+        }
+
+        if (userIdsToCreate.length === 0 && userIdsToRestore.length === 0) {
+            return res.status(400).json({ error: 'All selected users are already in the group' });
+        }
+
+        if (userIdsToCreate.length > 0) {
+            await prisma.chatParticipant.createMany({
+                data: userIdsToCreate.map((userId) => ({
+                    chatId,
+                    userId,
+                    unreadCount: 0,
+                })),
+            });
+        }
+
+        if (userIdsToRestore.length > 0) {
+            await prisma.chatParticipant.updateMany({
+                where: {
+                    chatId,
+                    userId: {
+                        in: userIdsToRestore,
+                    },
+                },
+                data: {
+                    leftAt: null,
+                    hiddenAt: null,
+                    unreadCount: 0,
+                },
+            });
+        }
+
+        const addedUserIds = [...userIdsToCreate, ...userIdsToRestore];
+
+        const addedUsers = validUsers.filter((user) => addedUserIds.includes(user.id));
+
+        await createSystemMessage({
+            chatId,
+            content: `${actor.displayName} added ${formatUserList(addedUsers)}`,
+            actorUserId: currentUserId,
+        });
 
         return res.status(200).json({ ok: true });
     } catch (error) {
@@ -657,22 +749,37 @@ async function leaveGroup(req, res, next) {
             return res.status(400).json({ error: 'chatId is required' });
         }
 
-        const participant = await prisma.chatParticipant.findUnique({
-            where: {
-                chatId_userId: {
-                    chatId,
-                    userId,
+        const [actor, participant] = await Promise.all([
+            prisma.user.findUnique({
+                where: {
+                    id: userId,
                 },
-            },
-            select: {
-                leftAt: true,
-                chat: {
-                    select: {
-                        type: true,
+                select: {
+                    id: true,
+                    displayName: true,
+                },
+            }),
+            prisma.chatParticipant.findUnique({
+                where: {
+                    chatId_userId: {
+                        chatId,
+                        userId,
                     },
                 },
-            },
-        });
+                select: {
+                    leftAt: true,
+                    chat: {
+                        select: {
+                            type: true,
+                        },
+                    },
+                },
+            }),
+        ]);
+
+        if (!actor) {
+            return res.status(404).json({ error: 'User not found' });
+        }
 
         if (!participant || participant.chat.type !== 'GROUP') {
             return res.status(404).json({ error: 'Group chat not found' });
@@ -691,24 +798,17 @@ async function leaveGroup(req, res, next) {
             },
             data: {
                 leftAt: new Date(),
+                hiddenAt: new Date(),
             },
         });
 
-        const remainingParticipants = await prisma.chatParticipant.findMany({
-            where: {
-                chatId,
-                leftAt: null,
-            },
-            select: {
-                userId: true,
-            },
+        await createSystemMessage({
+            chatId,
+            content: `${actor.displayName} left the group`,
+            actorUserId: userId,
         });
 
-        emitToUsers(
-            [userId, ...remainingParticipants.map((participant) => participant.userId)],
-            'sidebar:refresh',
-            { chatId }
-        );
+        emitToUsers([userId], 'sidebar:refresh', { chatId });
 
         return res.status(200).json({ ok: true });
     } catch (err) {
