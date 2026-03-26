@@ -79,12 +79,33 @@ export default function Chat() {
   const [selectedAttachment, setSelectedAttachment] = useState(null);
   const [attachmentPreviewUrl, setAttachmentPreviewUrl] = useState(null);
 
+  const [mentionMode, setMentionMode] = useState(false);
+  const [filteredMentions, setFilteredMentions] = useState([]);
+
   const existingUserIds = useMemo(
     () => chat?.participants?.map((p) => p.userId) || [],
     [chat],
   );
 
   const groupParticipants = useMemo(() => chat?.participants || [], [chat]);
+
+  const mentionableParticipants = useMemo(
+    () => chat?.participants?.filter((participant) => participant.user) || [],
+    [chat],
+  );
+
+  const mentionLookup = useMemo(() => {
+    const map = new Map();
+
+    mentionableParticipants.forEach((participant) => {
+      const username = participant.user?.username?.toLowerCase();
+      if (username) {
+        map.set(username, participant.user);
+      }
+    });
+
+    return map;
+  }, [mentionableParticipants]);
 
   const chatDisplayTitle =
     chat?.type === 'GROUP'
@@ -287,6 +308,61 @@ export default function Chat() {
     }
   }
 
+  function handleTextareaResize(el) {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+  }
+
+  function handleMentionLogic(value, cursorPos) {
+    const textBeforeCursor = value.slice(0, cursorPos);
+    const currentWord = textBeforeCursor.split(/\s/).pop() || '';
+
+    if (!currentWord.startsWith('@')) {
+      setMentionMode(false);
+      setFilteredMentions([]);
+      return;
+    }
+
+    const query = currentWord.slice(1).toLowerCase();
+
+    const results = mentionableParticipants.filter((participant) => {
+      const username = participant.user?.username?.toLowerCase() || '';
+      const displayName = participant.user?.displayName?.toLowerCase() || '';
+
+      return username.includes(query) || displayName.includes(query);
+    });
+
+    setMentionMode(results.length > 0);
+    setFilteredMentions(results);
+  }
+
+  function handleMentionClick(mention) {
+    const el = textareaRef.current;
+    if (!el) return;
+
+    const cursorPos = el.selectionStart;
+    const textBeforeCursor = message.slice(0, cursorPos);
+    const textAfterCursor = message.slice(cursorPos);
+    const currentWord = textBeforeCursor.split(/\s/).pop() || '';
+    const wordStartIndex = cursorPos - currentWord.length;
+    const mentionText = `@${mention.user.username} `;
+
+    const newMessage =
+      message.slice(0, wordStartIndex) + mentionText + textAfterCursor;
+
+    setMessage(newMessage);
+    setMentionMode(false);
+    setFilteredMentions([]);
+
+    requestAnimationFrame(() => {
+      const newCursorPos = wordStartIndex + mentionText.length;
+      el.focus();
+      el.setSelectionRange(newCursorPos, newCursorPos);
+      handleTextareaResize(el);
+    });
+  }
+
   function handleSettingsClick() {
     setShowSettings((prev) => !prev);
   }
@@ -424,6 +500,8 @@ export default function Chat() {
       });
 
       setMessage('');
+      setMentionMode(false);
+      setFilteredMentions([]);
       resetAttachmentState();
 
       if (textareaRef.current) {
@@ -595,6 +673,40 @@ export default function Chat() {
         ) : null}
       </a>
     );
+  }
+
+  function renderMessageContent(content) {
+    if (!content) return null;
+
+    const parts = content.split(/(@[a-zA-Z0-9_]+)/g);
+
+    return parts.map((part, index) => {
+      const match = part.match(/^@([a-zA-Z0-9_]+)$/);
+
+      if (!match) {
+        return <span key={index}>{part}</span>;
+      }
+
+      const username = match[1].toLowerCase();
+      const mentionedUser = mentionLookup.get(username);
+
+      if (!mentionedUser) {
+        return <span key={index}>{part}</span>;
+      }
+
+      const isCurrentUser = username === user.username?.toLowerCase();
+
+      return (
+        <span
+          key={index}
+          className={`${styles.mentionText} ${
+            isCurrentUser ? styles.mentionTextSelf : ''
+          }`}
+        >
+          {part}
+        </span>
+      );
+    });
   }
 
   if (loadingChat) {
@@ -930,7 +1042,9 @@ export default function Chat() {
                       {renderAttachment(msg)}
 
                       {msg.content ? (
-                        <p className={styles.messageContent}>{msg.content}</p>
+                        <p className={styles.messageContent}>
+                          {renderMessageContent(msg.content)}
+                        </p>
                       ) : null}
 
                       <div className={styles.messageMeta}>
@@ -989,6 +1103,32 @@ export default function Chat() {
             </div>
           )}
 
+          {mentionMode && (
+            <div className={styles.mentionBox}>
+              {filteredMentions.map((mention) => (
+                <div
+                  key={mention.user.id}
+                  className={styles.mentionItem}
+                  onClick={() => handleMentionClick(mention)}
+                >
+                  <img
+                    className={styles.messageAvatar}
+                    src={getAvatarSrc(mention.user.profilePictureUrl)}
+                    alt=""
+                  />
+                  <div className={styles.userInfo}>
+                    <div className={styles.mentionDisplayName}>
+                      {mention.user.displayName}
+                    </div>
+                    <div className={styles.mentionUsername}>
+                      @{mention.user.username}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className={styles.inputBar}>
             <input
               ref={fileInputRef}
@@ -1011,13 +1151,10 @@ export default function Chat() {
               className={styles.textarea}
               value={message}
               onChange={(e) => {
-                setMessage(e.target.value);
-
-                const el = textareaRef.current;
-                if (!el) return;
-
-                el.style.height = 'auto';
-                el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+                const nextValue = e.target.value;
+                setMessage(nextValue);
+                handleTextareaResize(e.target);
+                handleMentionLogic(nextValue, e.target.selectionStart);
               }}
               placeholder="Type a message..."
               onKeyDown={(e) => {
