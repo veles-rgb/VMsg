@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { HiAtSymbol, HiCalendarDays } from 'react-icons/hi2';
-import { FaArrowLeft, FaUserLarge } from 'react-icons/fa6';
+import { FaArrowLeft, FaComments, FaUserLarge } from 'react-icons/fa6';
 import { useAuth } from '../auth/AuthContext';
 import styles from './styles/Profile.module.css';
 
@@ -22,18 +22,22 @@ function formatJoinedDate(dateString) {
 
 export default function Profile() {
   const { username } = useParams();
-  const { token } = useAuth();
+  const navigate = useNavigate();
+  const { token, user } = useAuth();
   const apiUrl = import.meta.env.VITE_API_URL;
 
   const [profile, setProfile] = useState(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatError, setChatError] = useState('');
 
   useEffect(() => {
     async function fetchProfile() {
       try {
         setProfileLoading(true);
         setProfileError('');
+        setChatError('');
 
         const res = await fetch(
           `${apiUrl}/user/${encodeURIComponent(username || '')}`,
@@ -76,6 +80,42 @@ export default function Profile() {
 
     fetchProfile();
   }, [apiUrl, username, token]);
+
+  async function handleChatClick() {
+    if (!profile?.id || !token || chatLoading) return;
+
+    try {
+      setChatLoading(true);
+      setChatError('');
+
+      const res = await fetch(`${apiUrl}/chat/dm`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetId: profile.id,
+        }),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        throw new Error(
+          data?.message || data?.error || `Something went wrong: ${res.status}`,
+        );
+      }
+
+      navigate(`/chat/${data.chatId}`);
+    } catch (err) {
+      setChatError(err.message || 'Something went wrong');
+    } finally {
+      setChatLoading(false);
+    }
+  }
+
+  const isOwnProfile = profile?.id === user?.id;
 
   if (profileLoading) {
     return (
@@ -149,23 +189,39 @@ export default function Profile() {
       </div>
 
       <div className={styles.pageContent}>
+        {chatError && <div className={styles.feedbackError}>{chatError}</div>}
+
         <section className={styles.profileCard}>
           <div className={styles.profileTop}>
-            <div className={styles.avatarWrap}>
-              <img
-                className={styles.avatar}
-                src={profile.profilePictureUrl || DEFAULT_AVATAR}
-                alt={`${profile.displayName}'s avatar`}
-              />
+            <div className={styles.profileIdentity}>
+              <div className={styles.avatarWrap}>
+                <img
+                  className={styles.avatar}
+                  src={profile.profilePictureUrl || DEFAULT_AVATAR}
+                  alt={`${profile.displayName}'s avatar`}
+                />
+              </div>
+
+              <div className={styles.identityBlock}>
+                <h2 className={styles.displayName}>{profile.displayName}</h2>
+                <p className={styles.username}>
+                  <HiAtSymbol className={styles.inlineIcon} />
+                  {profile.username}
+                </p>
+              </div>
             </div>
 
-            <div className={styles.identityBlock}>
-              <h2 className={styles.displayName}>{profile.displayName}</h2>
-              <p className={styles.username}>
-                <HiAtSymbol className={styles.inlineIcon} />
-                {profile.username}
-              </p>
-            </div>
+            {!isOwnProfile && (
+              <button
+                type="button"
+                className={styles.chatButton}
+                onClick={handleChatClick}
+                disabled={chatLoading}
+              >
+                <FaComments />
+                {chatLoading ? 'Opening...' : 'Chat'}
+              </button>
+            )}
           </div>
 
           <div className={styles.infoGrid}>
