@@ -1,32 +1,18 @@
 :root {
-    /* Primary brand colors */
     --color-primary: #6a0dad;
-    /* Royal purple */
     --color-primary-dark: #4b0082;
-    /* Deep purple */
     --color-primary-light: #9d4edd;
-    /* Light purple */
 
-    /* Backgrounds */
     --color-bg-main: #0f0a19;
-    /* Very dark purple/black */
     --color-bg-secondary: #1b1329;
-    /* Card / panel background */
 
-    /* Text */
     --color-text-primary: #f5f3ff;
-    /* Main text */
     --color-text-secondary: #c4b5fd;
-    /* Muted purple text */
 
-    /* Accent */
     --color-accent: #00d4ff;
-    /* Cyan accent for buttons/links */
 
-    /* Borders */
     --color-border: #3b2a5a;
 
-    /* States */
     --color-success: #22c55e;
     --color-warning: #f59e0b;
     --color-danger: #ef4444;
@@ -38,10 +24,17 @@ body {
     margin: 0;
 }
 
+body {
+    background-color: var(--color-bg-main);
+    color: var(--color-text-primary);
+}
+
 #root {
     height: 100vh;
     display: grid;
     grid-template-columns: 260px 1fr;
+    grid-template-rows: 100vh;
+    overflow: hidden;
 }
 
 header {
@@ -51,6 +44,17 @@ header {
     align-items: center;
     background-color: var(--color-primary);
     color: var(--color-text-primary);
+    min-width: 0;
+    min-height: 0;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+main {
+    min-width: 0;
+    min-height: 0;
+    overflow: auto;
+    box-sizing: border-box;
 }
 
 form {
