@@ -127,6 +127,10 @@
     flex: 0 0 42px;
 }
 
+.messageAvatar:hover {
+    cursor: pointer;
+}
+
 .messageBubble {
     max-width: min(70%, 520px);
     padding: 0.8rem 1rem;
