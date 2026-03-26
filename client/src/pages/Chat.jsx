@@ -774,6 +774,7 @@ export default function Chat() {
       >
         {!isOwn && (
           <img
+            onClick={() => navigate(`/user/${msg.sender?.username}`)}
             className={styles.messageAvatar}
             src={getAvatarSrc(msg.sender?.profilePictureUrl)}
             alt={`${msg.sender?.displayName || 'User'}'s avatar`}
