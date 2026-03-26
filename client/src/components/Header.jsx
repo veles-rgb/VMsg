@@ -483,7 +483,9 @@ export default function Header() {
         ) : (
           <>
             <div className={styles.loggedOutTop}>
-              <h1 className={styles.title}>VMsg</h1>
+              <Link to="/" className={styles.logoLink}>
+                <h1 className={styles.title}>VMsg</h1>
+              </Link>
             </div>
 
             <div className={styles.noUserButtons}>
