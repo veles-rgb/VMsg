@@ -189,6 +189,7 @@ async function getUserInfoByUsername(req, res, next) {
                 id: true,
                 displayName: true,
                 username: true,
+                profilePictureUrl: true,
                 createdAt: true,
             },
         });
