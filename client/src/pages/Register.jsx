@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import styles from './styles/Register.module.css';
 
 export default function Register() {
   const [username, setUsername] = useState('');
@@ -53,68 +54,88 @@ export default function Register() {
       setPassword('');
       setConfirmPassword('');
     } catch (err) {
-      setRegisterErr(err.message || `Something went wrong`);
+      setRegisterErr(err.message || 'Something went wrong');
     } finally {
       setRegisterLoading(false);
     }
   }
 
   return (
-    <main>
-      <form onSubmit={handleSubmit}>
-        <h2>Register</h2>
-
-        {registerErr && <p style={{ color: 'red' }}>{registerErr}</p>}
-
-        <label>
-          Username
-          <input
-            type="text"
-            name="username"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </label>
-        <label>
-          Display Name
-          <input
-            type="text"
-            name="displayName"
-            id="displayName"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            name="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <label>
-          Confirm Password
-          <input
-            type="password"
-            name="confirmPassword"
-            id="confirmPassword"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-          />
-        </label>
-
-        <button type="submit" disabled={registerLoading}>
-          {registerLoading ? 'Registering' : 'Register'}
-        </button>
-
-        <p>
-          Already have an account? <a href="/login">login</a>
+    <main className={styles.main}>
+      <section className={styles.card}>
+        <div className={styles.badge}>Create account</div>
+        <h2 className={styles.title}>Register</h2>
+        <p className={styles.subtitle}>
+          Create your VMsg account to start messaging right away.
         </p>
-      </form>
+
+        <form className={styles.form} onSubmit={handleSubmit}>
+          {registerErr && <p className={styles.error}>{registerErr}</p>}
+
+          <label className={styles.label}>
+            Username
+            <input
+              className={styles.input}
+              type="text"
+              name="username"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </label>
+
+          <label className={styles.label}>
+            Display Name
+            <input
+              className={styles.input}
+              type="text"
+              name="displayName"
+              id="displayName"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
+          </label>
+
+          <label className={styles.label}>
+            Password
+            <input
+              className={styles.input}
+              type="password"
+              name="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+
+          <label className={styles.label}>
+            Confirm Password
+            <input
+              className={styles.input}
+              type="password"
+              name="confirmPassword"
+              id="confirmPassword"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+          </label>
+
+          <button
+            className={styles.submitButton}
+            type="submit"
+            disabled={registerLoading}
+          >
+            {registerLoading ? 'Registering...' : 'Register'}
+          </button>
+        </form>
+
+        <p className={styles.footerText}>
+          Already have an account?{' '}
+          <Link className={styles.link} to="/login">
+            Login
+          </Link>
+        </p>
+      </section>
     </main>
   );
 }

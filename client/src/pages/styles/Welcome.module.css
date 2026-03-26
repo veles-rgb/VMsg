@@ -1,0 +1,111 @@
+.main {
+    min-height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    background:
+        radial-gradient(circle at top left, rgba(157, 78, 221, 0.16), transparent 28%),
+        radial-gradient(circle at bottom right, rgba(0, 212, 255, 0.08), transparent 25%),
+        var(--color-bg-main);
+    box-sizing: border-box;
+}
+
+.card {
+    width: min(560px, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 2rem;
+    border: 1px solid var(--color-border);
+    border-radius: 1.25rem;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0.02) 100%),
+        var(--color-bg-secondary);
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.18);
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.35rem 0.7rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-secondary);
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.title {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 800;
+    line-height: 1.05;
+}
+
+.subtitle {
+    margin: 0;
+    color: var(--color-text-secondary);
+    font-size: 1rem;
+    line-height: 1.65;
+    max-width: 48ch;
+}
+
+.actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+    width: 100%;
+    margin-top: 0.25rem;
+}
+
+.primaryButton,
+.secondaryButton {
+    border: none;
+    border-radius: 0.95rem;
+    padding: 0.95rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s ease, opacity 0.15s ease, background 0.15s ease;
+}
+
+.primaryButton:hover,
+.secondaryButton:hover {
+    transform: translateY(-1px);
+}
+
+.primaryButton {
+    background: var(--color-primary);
+    color: white;
+}
+
+.secondaryButton {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--color-text-primary);
+    border: 1px solid var(--color-border);
+}
+
+@media (max-width: 540px) {
+    .main {
+        padding: 1rem 0.75rem;
+    }
+
+    .card {
+        padding: 1.25rem;
+    }
+
+    .actions {
+        flex-direction: column;
+    }
+
+    .primaryButton,
+    .secondaryButton {
+        width: 100%;
+    }
+}

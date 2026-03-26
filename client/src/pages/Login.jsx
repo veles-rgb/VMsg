@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import styles from './styles/Login.module.css';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -20,7 +21,10 @@ export default function Login() {
     setLoginErr('');
 
     try {
-      const loginPayload = { username, password };
+      const loginPayload = {
+        username: username.trim(),
+        password,
+      };
 
       const res = await fetch(`${apiUrl}/auth/login`, {
         method: 'POST',
@@ -36,7 +40,6 @@ export default function Login() {
       const data = await res.json();
 
       login(data);
-
       navigate('/');
     } catch (err) {
       setLoginErr(err.message || 'Something went wrong');
@@ -46,39 +49,55 @@ export default function Login() {
   }
 
   return (
-    <main>
-      <form onSubmit={handleSubmit}>
-        <h2>Login</h2>
+    <main className={styles.main}>
+      <section className={styles.card}>
+        <div className={styles.badge}>Welcome back</div>
+        <h2 className={styles.title}>Login</h2>
+        <p className={styles.subtitle}>Sign in to continue chatting on VMsg.</p>
 
-        {loginErr && <p style={{ color: 'red' }}>{loginErr}</p>}
+        <form className={styles.form} onSubmit={handleSubmit}>
+          {loginErr && <p className={styles.error}>{loginErr}</p>}
 
-        <label>
-          Username
-          <input
-            type="text"
-            name="username"
-            id="username"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            type="password"
-            name="password"
-            id="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
+          <label className={styles.label}>
+            Username
+            <input
+              className={styles.input}
+              type="text"
+              name="username"
+              id="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+          </label>
 
-        <button type="submit">{loginLoading ? 'logging in' : 'Login'}</button>
+          <label className={styles.label}>
+            Password
+            <input
+              className={styles.input}
+              type="password"
+              name="password"
+              id="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
 
-        <p>
-          Don't have an account? <a href="/register">Register</a>
+          <button
+            className={styles.submitButton}
+            type="submit"
+            disabled={loginLoading}
+          >
+            {loginLoading ? 'Logging in...' : 'Login'}
+          </button>
+        </form>
+
+        <p className={styles.footerText}>
+          Don&apos;t have an account?{' '}
+          <Link className={styles.link} to="/register">
+            Register
+          </Link>
         </p>
-      </form>
+      </section>
     </main>
   );
 }
