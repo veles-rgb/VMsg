@@ -7,5 +7,6 @@ router.get('/online', controller.getOnlineUsers);
 router.get('/search', controller.searchUsers);
 router.patch('/profile-picture', upload.single('file'), controller.uploadProfilePicture);
 router.patch('/display-name', controller.updateDisplayName);
+router.get('/:username', controller.getUserInfoByUsername);
 
 module.exports = router;
