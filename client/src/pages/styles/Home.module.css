@@ -277,8 +277,16 @@
 }
 
 .featuredArrow {
-    color: var(--color-text-secondary);
+    color: var(--color-primary);
     flex: 0 0 auto;
+    background: none;
+    border: none;
+    font-size: 2rem;
+}
+
+.featuredArrow:hover {
+    cursor: pointer;
+    color: var(--color-text-secondary);
 }
 
 .feedbackError {
@@ -474,6 +482,12 @@
     font-size: 0.88rem;
     font-weight: 700;
     white-space: nowrap;
+    border: none;
+}
+
+.messagePill:hover {
+    cursor: pointer;
+    background-color: var(--color-text-secondary);
 }
 
 @media (max-width: 1100px) {
