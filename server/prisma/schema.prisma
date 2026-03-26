@@ -12,6 +12,11 @@ enum ChatType {
   GROUP
 }
 
+enum MessageType {
+  USER
+  SYSTEM
+}
+
 model User {
   id             String   @id @default(uuid()) @db.Uuid
   username       String   @unique @db.VarChar(25)
@@ -60,11 +65,12 @@ model ChatParticipant {
 }
 
 model Message {
-  id                 String    @id @default(uuid()) @db.Uuid
-  chatId             String    @db.Uuid
-  senderUserId       String    @db.Uuid
+  id                 String      @id @default(uuid()) @db.Uuid
+  chatId             String      @db.Uuid
+  senderUserId       String?     @db.Uuid
   content            String?
-  sentAt             DateTime  @default(now())
+  sentAt             DateTime    @default(now())
+  type               MessageType @default(USER)
 
   attachmentUrl      String?
   attachmentPublicId String?
@@ -72,8 +78,8 @@ model Message {
   attachmentName     String?
   attachmentBytes    Int?
 
-  chat   Chat @relation(fields: [chatId], references: [id])
-  sender User @relation(fields: [senderUserId], references: [id])
+  chat   Chat  @relation(fields: [chatId], references: [id])
+  sender User? @relation(fields: [senderUserId], references: [id])
 
   @@index([chatId, sentAt])
   @@index([senderUserId])
