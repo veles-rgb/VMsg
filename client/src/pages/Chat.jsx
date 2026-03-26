@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatDate } from '../utils/formatDate';
 import styles from './styles/Chat.module.css';
 import { getSocket } from '../socket';
-
 import {
   FaGear,
   FaPlus,
@@ -13,7 +12,6 @@ import {
   FaArrowRightFromBracket,
   FaUserPlus,
 } from 'react-icons/fa6';
-
 import { FaEdit, FaRegWindowClose, FaUsers } from 'react-icons/fa';
 
 const DEFAULT_AVATAR =
@@ -25,13 +23,13 @@ function getAvatarSrc(profilePictureUrl) {
 
 function formatBytes(bytes) {
   if (!bytes || Number.isNaN(Number(bytes))) return '';
+
   const value = Number(bytes);
 
   if (value < 1024) return `${value} B`;
   if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-  if (value < 1024 * 1024 * 1024) {
+  if (value < 1024 * 1024 * 1024)
     return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-  }
 
   return `${(value / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
@@ -83,7 +81,7 @@ export default function Chat() {
   const [filteredMentions, setFilteredMentions] = useState([]);
 
   const existingUserIds = useMemo(
-    () => chat?.participants?.map((p) => p.userId) || [],
+    () => chat?.participants?.map((participant) => participant.userId) || [],
     [chat],
   );
 
@@ -112,32 +110,32 @@ export default function Chat() {
       ? chat?.title || 'Group Chat'
       : chat?.title || otherParticipants[0]?.user?.displayName || 'Chat';
 
-  useEffect(() => {
-    if (!chatRef.current) return;
-    chatRef.current.scrollTop = chatRef.current.scrollHeight;
-  }, [messages]);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
-        setShowSettings(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
+  const resetUserSearchState = useCallback(() => {
+    setSearchTerm('');
+    setSearchResults([]);
+    setSelectedUsers([]);
+    setSearchErrors('');
+    setAddUsersError('');
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (attachmentPreviewUrl) {
-        URL.revokeObjectURL(attachmentPreviewUrl);
-      }
-    };
+  const resetAttachmentState = useCallback(() => {
+    if (attachmentPreviewUrl) {
+      URL.revokeObjectURL(attachmentPreviewUrl);
+    }
+
+    setSelectedAttachment(null);
+    setAttachmentPreviewUrl(null);
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   }, [attachmentPreviewUrl]);
+
+  const handleTextareaResize = useCallback((el) => {
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
+  }, []);
 
   const refreshChat = useCallback(async () => {
     const res = await fetch(`${apiUrl}/chat/${chatId}`, {
@@ -168,21 +166,74 @@ export default function Chat() {
         },
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(
           data?.error || data?.message || `Something went wrong: ${res.status}`,
         );
       }
 
-      const data = await res.json();
-      setMessages(data.messages || []);
+      setMessages(data?.messages || []);
     } catch (err) {
       setMessageError(err.message || 'Something went wrong');
     } finally {
       setLoadingMessages(false);
     }
   }, [apiUrl, chatId, token]);
+
+  const uploadAttachmentIfNeeded = useCallback(async () => {
+    if (!selectedAttachment) return null;
+
+    const formData = new FormData();
+    formData.append('file', selectedAttachment);
+    formData.append('folderKey', 'chatAttachments');
+
+    const uploadRes = await fetch(`${apiUrl}/upload`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const uploadData = await uploadRes.json().catch(() => null);
+
+    if (!uploadRes.ok) {
+      throw new Error(
+        uploadData?.error || uploadData?.message || 'Failed to upload file',
+      );
+    }
+
+    return uploadData?.data || null;
+  }, [apiUrl, selectedAttachment, token]);
+
+  useEffect(() => {
+    if (!chatRef.current) return;
+    chatRef.current.scrollTop = chatRef.current.scrollHeight;
+  }, [messages]);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (settingsRef.current && !settingsRef.current.contains(e.target)) {
+        setShowSettings(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (attachmentPreviewUrl) {
+        URL.revokeObjectURL(attachmentPreviewUrl);
+      }
+    };
+  }, [attachmentPreviewUrl]);
 
   useEffect(() => {
     async function loadChat() {
@@ -199,12 +250,12 @@ export default function Chat() {
 
     if (!token) return;
     loadChat();
-  }, [token, refreshChat]);
+  }, [refreshChat, token]);
 
   useEffect(() => {
     if (!token) return;
     fetchMessages();
-  }, [token, fetchMessages]);
+  }, [fetchMessages, token]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -222,18 +273,16 @@ export default function Chat() {
     if (!socket || !chatId) return;
 
     function handleIncomingMessage(payload) {
-      if (payload.chatId !== chatId || !payload.message) return;
+      if (payload?.chatId !== chatId || !payload?.message) return;
 
       setMessages((prev) => {
         const exists = prev.some((msg) => msg.id === payload.message.id);
-        if (exists) return prev;
-        return [...prev, payload.message];
+        return exists ? prev : [...prev, payload.message];
       });
     }
 
     function handleSidebarRefresh(payload) {
-      if (!payload?.chatId || payload.chatId !== chatId) return;
-
+      if (payload?.chatId !== chatId) return;
       refreshChat().catch(() => {});
     }
 
@@ -270,13 +319,13 @@ export default function Chat() {
           },
         );
 
+        const data = await res.json().catch(() => null);
+
         if (!res.ok) {
-          const data = await res.json().catch(() => null);
           throw new Error(data?.error || `Something went wrong: ${res.status}`);
         }
 
-        const data = await res.json();
-        setSearchResults(data.users || []);
+        setSearchResults(data?.users || []);
       } catch (err) {
         setSearchErrors(err.message || 'Something went wrong');
       } finally {
@@ -285,34 +334,7 @@ export default function Chat() {
     }, 300);
 
     return () => clearTimeout(timeout);
-  }, [apiUrl, searchTerm, token, showSearchUser]);
-
-  function resetUserSearchState() {
-    setSearchTerm('');
-    setSearchResults([]);
-    setSelectedUsers([]);
-    setSearchErrors('');
-    setAddUsersError('');
-  }
-
-  function resetAttachmentState() {
-    if (attachmentPreviewUrl) {
-      URL.revokeObjectURL(attachmentPreviewUrl);
-    }
-
-    setSelectedAttachment(null);
-    setAttachmentPreviewUrl(null);
-
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  }
-
-  function handleTextareaResize(el) {
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 150)}px`;
-  }
+  }, [apiUrl, searchTerm, showSearchUser, token]);
 
   function handleMentionLogic(value, cursorPos) {
     const textBeforeCursor = value.slice(0, cursorPos);
@@ -348,10 +370,10 @@ export default function Chat() {
     const wordStartIndex = cursorPos - currentWord.length;
     const mentionText = `@${mention.user.username} `;
 
-    const newMessage =
+    const nextMessage =
       message.slice(0, wordStartIndex) + mentionText + textAfterCursor;
 
-    setMessage(newMessage);
+    setMessage(nextMessage);
     setMentionMode(false);
     setFilteredMentions([]);
 
@@ -363,26 +385,10 @@ export default function Chat() {
     });
   }
 
-  function handleSettingsClick() {
-    setShowSettings((prev) => !prev);
-  }
-
-  function handleRenameChat() {
-    setShowTitleForm(true);
-    setShowSettings(false);
-    setNewTitleError('');
-  }
-
   function handleCloseTitleForm() {
     setShowTitleForm(false);
     setNewTitleError('');
     setNewTitle(chat?.title || '');
-  }
-
-  function handleShowUserSearch() {
-    setShowSearchUser(true);
-    setAddUsersError('');
-    setSearchErrors('');
   }
 
   function handleCloseUserSearch() {
@@ -390,29 +396,16 @@ export default function Chat() {
     resetUserSearchState();
   }
 
-  function handleOpenUsersModal() {
-    setShowUsersModal(true);
-    setShowSettings(false);
-  }
-
-  function handleCloseUsersModal() {
-    setShowUsersModal(false);
-  }
-
   function toggleSelectedUser(clickedUser) {
     setSelectedUsers((prev) => {
-      const exists = prev.some((u) => u.id === clickedUser.id);
+      const exists = prev.some((userItem) => userItem.id === clickedUser.id);
 
       if (exists) {
-        return prev.filter((u) => u.id !== clickedUser.id);
+        return prev.filter((userItem) => userItem.id !== clickedUser.id);
       }
 
       return [...prev, clickedUser];
     });
-  }
-
-  function handleAttachmentButtonClick() {
-    fileInputRef.current?.click();
   }
 
   function handleAttachmentChange(e) {
@@ -432,32 +425,6 @@ export default function Chat() {
     }
 
     setAttachmentPreviewUrl(null);
-  }
-
-  async function uploadAttachmentIfNeeded() {
-    if (!selectedAttachment) return null;
-
-    const formData = new FormData();
-    formData.append('file', selectedAttachment);
-    formData.append('folderKey', 'chatAttachments');
-
-    const uploadRes = await fetch(`${apiUrl}/upload`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-      body: formData,
-    });
-
-    const uploadData = await uploadRes.json().catch(() => null);
-
-    if (!uploadRes.ok) {
-      throw new Error(
-        uploadData?.error || uploadData?.message || 'Failed to upload file',
-      );
-    }
-
-    return uploadData?.data || null;
   }
 
   async function handleSend() {
@@ -495,8 +462,7 @@ export default function Chat() {
 
       setMessages((prev) => {
         const exists = prev.some((msg) => msg.id === data.message?.id);
-        if (exists) return prev;
-        return [...prev, data.message];
+        return exists ? prev : [...prev, data.message];
       });
 
       setMessage('');
@@ -534,8 +500,9 @@ export default function Chat() {
         }),
       });
 
+      const data = await res.json().catch(() => null);
+
       if (!res.ok) {
-        const data = await res.json().catch(() => null);
         throw new Error(
           data?.error || data?.message || `Something went wrong: ${res.status}`,
         );
@@ -709,6 +676,130 @@ export default function Chat() {
     });
   }
 
+  function renderUserResult(searchUser) {
+    const isSelected = selectedUsers.some(
+      (selectedUser) => selectedUser.id === searchUser.id,
+    );
+    const isExisting = existingUserIds.includes(searchUser.id);
+
+    return (
+      <button
+        key={searchUser.id}
+        type="button"
+        className={`${styles.userButton} ${
+          isSelected ? styles.userButtonSelected : ''
+        } ${isExisting ? styles.userButtonDisabled : ''}`}
+        onClick={() => {
+          if (isExisting) return;
+          toggleSelectedUser(searchUser);
+        }}
+        disabled={isExisting}
+      >
+        <div className={styles.userRow}>
+          <img
+            className={styles.userAvatar}
+            src={getAvatarSrc(searchUser.profilePictureUrl)}
+            alt={`${searchUser.displayName}'s avatar`}
+          />
+
+          <div className={styles.userMeta}>
+            <span className={styles.memberDisplayName}>
+              {searchUser.displayName}
+            </span>
+            <span className={styles.memberUsername}>
+              @{searchUser.username}
+            </span>
+          </div>
+
+          <span className={styles.userStatus}>
+            {isExisting ? 'In group' : isSelected ? '✓' : ''}
+          </span>
+        </div>
+      </button>
+    );
+  }
+
+  function renderGroupMember(participant) {
+    const participantUser = participant.user;
+    const isMe = participant.userId === user.id;
+
+    if (!participantUser) return null;
+
+    return (
+      <div key={participant.userId} className={styles.userButtonStatic}>
+        <div className={styles.userRow}>
+          <img
+            className={styles.userAvatar}
+            src={getAvatarSrc(participantUser.profilePictureUrl)}
+            alt={`${participantUser.displayName}'s avatar`}
+          />
+
+          <div className={styles.userMeta}>
+            <span className={styles.memberDisplayName}>
+              {participantUser.displayName}
+            </span>
+            <span className={styles.memberUsername}>
+              @{participantUser.username}
+            </span>
+          </div>
+
+          <span className={styles.userStatus}>{isMe ? 'Me' : ''}</span>
+        </div>
+      </div>
+    );
+  }
+
+  function renderChatMessage(msg) {
+    if (msg.type === 'SYSTEM') {
+      return (
+        <div key={msg.id} className={styles.systemMessageRow}>
+          <div className={styles.systemMessage}>
+            {msg.content}
+            <span className={styles.systemMessageTime}>
+              {formatDate(msg.sentAt)}
+            </span>
+          </div>
+        </div>
+      );
+    }
+
+    const isOwn = msg.sender?.id === user.id;
+
+    return (
+      <div
+        key={msg.id}
+        className={`${styles.messageRow} ${
+          isOwn ? styles.ownMessage : styles.otherMessage
+        }`}
+      >
+        {!isOwn && (
+          <img
+            className={styles.messageAvatar}
+            src={getAvatarSrc(msg.sender?.profilePictureUrl)}
+            alt={`${msg.sender?.displayName || 'User'}'s avatar`}
+          />
+        )}
+
+        <div className={styles.messageBubble}>
+          {renderAttachment(msg)}
+
+          {msg.content ? (
+            <p className={styles.messageContent}>
+              {renderMessageContent(msg.content)}
+            </p>
+          ) : null}
+
+          <div className={styles.messageMeta}>
+            <span className={styles.senderName}>
+              {msg.sender?.displayName || 'Unknown User'}
+            </span>
+            <span className={styles.messageTime}>{formatDate(msg.sentAt)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (loadingChat) {
     return (
       <main className={styles.main}>
@@ -732,7 +823,11 @@ export default function Chat() {
           <div className={styles.headerLeft}>
             <FaUserPlus
               className={styles.headerIcon}
-              onClick={handleShowUserSearch}
+              onClick={() => {
+                setShowSearchUser(true);
+                setAddUsersError('');
+                setSearchErrors('');
+              }}
             />
           </div>
         ) : (
@@ -745,19 +840,29 @@ export default function Chat() {
           {chat?.type === 'GROUP' && (
             <FaUsers
               className={styles.headerIcon}
-              onClick={handleOpenUsersModal}
+              onClick={() => {
+                setShowUsersModal(true);
+                setShowSettings(false);
+              }}
             />
           )}
 
           <div ref={settingsRef} className={styles.settingsWrapper}>
             <FaGear
               className={styles.headerIcon}
-              onClick={handleSettingsClick}
+              onClick={() => setShowSettings((prev) => !prev)}
             />
 
             {showSettings && (
               <div className={styles.settingsDropdown}>
-                <div className={styles.dropdownItem} onClick={handleRenameChat}>
+                <div
+                  className={styles.dropdownItem}
+                  onClick={() => {
+                    setShowTitleForm(true);
+                    setShowSettings(false);
+                    setNewTitleError('');
+                  }}
+                >
                   <FaEdit />
                   Rename Chat
                 </div>
@@ -846,48 +951,7 @@ export default function Chat() {
                 !loadingSearchUser ? (
                   <p className={styles.searchStatus}>No users found.</p>
                 ) : (
-                  searchResults.map((searchUser) => {
-                    const isSelected = selectedUsers.some(
-                      (selectedUser) => selectedUser.id === searchUser.id,
-                    );
-                    const isExisting = existingUserIds.includes(searchUser.id);
-
-                    return (
-                      <button
-                        key={searchUser.id}
-                        type="button"
-                        className={`${styles.userButton} ${
-                          isSelected ? styles.userButtonSelected : ''
-                        } ${isExisting ? styles.userButtonDisabled : ''}`}
-                        onClick={() => {
-                          if (isExisting) return;
-                          toggleSelectedUser(searchUser);
-                        }}
-                        disabled={isExisting}
-                      >
-                        <div className={styles.userRow}>
-                          <img
-                            className={styles.userAvatar}
-                            src={getAvatarSrc(searchUser.profilePictureUrl)}
-                            alt={`${searchUser.displayName}'s avatar`}
-                          />
-
-                          <div className={styles.userMeta}>
-                            <span className={styles.memberDisplayName}>
-                              {searchUser.displayName}
-                            </span>
-                            <span className={styles.memberUsername}>
-                              @{searchUser.username}
-                            </span>
-                          </div>
-
-                          <span className={styles.userStatus}>
-                            {isExisting ? 'In group' : isSelected ? '✓' : ''}
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })
+                  searchResults.map(renderUserResult)
                 )}
               </div>
 
@@ -914,7 +978,10 @@ export default function Chat() {
       )}
 
       {showUsersModal && (
-        <div className={styles.modalOverlay} onClick={handleCloseUsersModal}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowUsersModal(false)}
+        >
           <div
             className={styles.modalCard}
             onClick={(e) => e.stopPropagation()}
@@ -923,7 +990,7 @@ export default function Chat() {
               <h3 className={styles.modalTitle}>Group Members</h3>
               <FaRegWindowClose
                 className={styles.modalClose}
-                onClick={handleCloseUsersModal}
+                onClick={() => setShowUsersModal(false)}
               />
             </div>
 
@@ -931,40 +998,7 @@ export default function Chat() {
               {groupParticipants.length === 0 ? (
                 <p className={styles.searchStatus}>No users found.</p>
               ) : (
-                groupParticipants.map((participant) => {
-                  const participantUser = participant.user;
-                  const isMe = participant.userId === user.id;
-
-                  if (!participantUser) return null;
-
-                  return (
-                    <div
-                      key={participant.userId}
-                      className={styles.userButtonStatic}
-                    >
-                      <div className={styles.userRow}>
-                        <img
-                          className={styles.userAvatar}
-                          src={getAvatarSrc(participantUser.profilePictureUrl)}
-                          alt={`${participantUser.displayName}'s avatar`}
-                        />
-
-                        <div className={styles.userMeta}>
-                          <span className={styles.memberDisplayName}>
-                            {participantUser.displayName}
-                          </span>
-                          <span className={styles.memberUsername}>
-                            @{participantUser.username}
-                          </span>
-                        </div>
-
-                        <span className={styles.userStatus}>
-                          {isMe ? 'Me' : ''}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })
+                groupParticipants.map(renderGroupMember)
               )}
             </div>
           </div>
@@ -1020,45 +1054,7 @@ export default function Chat() {
             ) : messages.length === 0 ? (
               <p>No messages yet.</p>
             ) : (
-              messages.map((msg) => {
-                const isOwn = msg.sender.id === user.id;
-
-                return (
-                  <div
-                    key={msg.id}
-                    className={`${styles.messageRow} ${
-                      isOwn ? styles.ownMessage : styles.otherMessage
-                    }`}
-                  >
-                    {!isOwn && (
-                      <img
-                        className={styles.messageAvatar}
-                        src={getAvatarSrc(msg.sender.profilePictureUrl)}
-                        alt={`${msg.sender.displayName}'s avatar`}
-                      />
-                    )}
-
-                    <div className={styles.messageBubble}>
-                      {renderAttachment(msg)}
-
-                      {msg.content ? (
-                        <p className={styles.messageContent}>
-                          {renderMessageContent(msg.content)}
-                        </p>
-                      ) : null}
-
-                      <div className={styles.messageMeta}>
-                        <span className={styles.senderName}>
-                          {msg.sender.displayName}
-                        </span>
-                        <span className={styles.messageTime}>
-                          {formatDate(msg.sentAt)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
+              messages.map(renderChatMessage)
             )}
           </div>
         </div>
@@ -1140,7 +1136,7 @@ export default function Chat() {
             <button
               className={styles.attachmentBtn}
               type="button"
-              onClick={handleAttachmentButtonClick}
+              onClick={() => fileInputRef.current?.click()}
             >
               <FaPlus />
             </button>
