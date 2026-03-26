@@ -12,9 +12,9 @@ import Login from './pages/Login.jsx';
 import Chat from './pages/Chat.jsx';
 import CreateChat from './pages/CreateChat.jsx';
 import Me from './pages/Me.jsx';
+import Profile from './pages/Profile.jsx';
 
 function App() {
-  const apiUrl = import.meta.env.VITE_API_URL;
   const { user, token, logout, verify, authLoading } = useAuth();
 
   useEffect(() => {
@@ -53,6 +53,7 @@ function App() {
             <Route path="/chat/:chatId" element={<Chat />} />
             <Route path="/chat/new/:type" element={<CreateChat />} />
             <Route path="/me" element={<Me />} />
+            <Route path="/user/:username" element={<Profile />} />
           </>
         )}
 
