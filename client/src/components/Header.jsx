@@ -360,7 +360,12 @@ export default function Header() {
               </Link>
 
               <div ref={createMenuRef} className={styles.sectionHeader}>
-                <h2 className={styles.sectionTitle}>Chats</h2>
+                <h2
+                  className={styles.sectionTitle}
+                  onClick={() => navigate('/chats')}
+                >
+                  Chats
+                </h2>
 
                 <button
                   className={styles.iconButton}
