@@ -148,10 +148,14 @@ export default function Profile() {
       <main className={styles.main}>
         <div className={styles.pageHeader}>
           <div className={styles.pageHeaderInner}>
-            <Link to="/" className={styles.backLink}>
+            <button
+              type="button"
+              className={styles.backLink}
+              onClick={() => navigate(-1)}
+            >
               <FaArrowLeft />
               Back
-            </Link>
+            </button>
             <div className={styles.headerText}>
               <span className={styles.headerBadge}>Profile</span>
               <h1 className={styles.headerTitle}>Profile</h1>
@@ -173,10 +177,14 @@ export default function Profile() {
     <main className={styles.main}>
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderInner}>
-          <Link to="/" className={styles.backLink}>
-            <FaArrowLeft />
-            Back
-          </Link>
+          <button
+            type="button"
+            className={styles.backLink}
+            onClick={() => navigate(-1)}
+          >
+            {' '}
+            <FaArrowLeft /> Back{' '}
+          </button>
 
           <div className={styles.headerText}>
             <span className={styles.headerBadge}>Profile</span>
