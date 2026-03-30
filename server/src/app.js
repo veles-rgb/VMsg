@@ -3,35 +3,45 @@ const express = require("express");
 const http = require("http");
 const cors = require("cors");
 
-const app = express();
-
 const router = require("./routes/index");
 const { initSocket } = require("./socket");
 
-// CORS
+const app = express();
+
+const allowedOrigins = [
+    "https://vmsg.up.railway.app",
+    "http://localhost:5173",
+];
+
 app.use(
     cors({
-        origin: process.env.CLIENT_URL || "https://vmsg.up.railway.app",
+        origin(origin, callback) {
+            if (!origin) return callback(null, true);
+
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+
+            return callback(new Error(`Not allowed by CORS: ${origin}`));
+        },
         credentials: true,
     })
 );
 
-app.options("*", cors());
-
-// Body parser
 app.use(express.json());
 
-// Routes
 app.use("/api", router);
 
-const PORT = process.env.SERVER_PORT || 3001;
+app.get("/", (req, res) => {
+    res.send("API is running");
+});
+
+const PORT = process.env.PORT || 3001;
 
 const server = http.createServer(app);
 
-// Initialize socket.io
 initSocket(server);
 
-// Start server
 server.listen(PORT, () => {
     console.log("Server is running on port", PORT);
 });
