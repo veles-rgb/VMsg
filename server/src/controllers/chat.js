@@ -235,6 +235,27 @@ async function getAllChats(req, res, next) {
                         },
                     },
                 },
+                messages: {
+                    orderBy: {
+                        sentAt: 'desc',
+                    },
+                    take: 1,
+                    select: {
+                        id: true,
+                        content: true,
+                        sentAt: true,
+                        type: true,
+                        attachmentType: true,
+                        attachmentName: true,
+                        sender: {
+                            select: {
+                                id: true,
+                                displayName: true,
+                                username: true,
+                            },
+                        },
+                    },
+                },
             },
         });
 
@@ -251,6 +272,7 @@ async function getAllChats(req, res, next) {
                 ...chat,
                 unreadCount: currentParticipant?.unreadCount || 0,
                 otherParticipants,
+                lastMessage: chat.messages[0] || null,
             };
         });
 
