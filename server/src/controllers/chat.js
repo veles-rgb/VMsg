@@ -117,8 +117,14 @@ async function createGroup(req, res, next) {
         const createdByUserId = req.user.id;
         const { title, participants } = req.body;
 
-        if (!title || !title.trim()) {
+        const trimmedTitle = title?.trim();
+
+        if (!trimmedTitle) {
             return res.status(400).json({ error: 'Group title is required' });
+        }
+
+        if (trimmedTitle.length > 100) {
+            return res.status(400).json({ error: 'Chat title must be 100 characters or less' });
         }
 
         if (!Array.isArray(participants) || participants.length === 0) {
@@ -166,7 +172,7 @@ async function createGroup(req, res, next) {
         const chat = await prisma.chat.create({
             data: {
                 type: 'GROUP',
-                title: title.trim(),
+                title: trimmedTitle,
                 createdByUserId,
             },
             select: {
@@ -421,6 +427,12 @@ async function sendChatMsg(req, res, next) {
         if (!trimmedContent && !attachmentUrl) {
             return res.status(400).json({
                 error: 'Message content or attachment is required',
+            });
+        }
+
+        if (trimmedContent && trimmedContent.length > 2000) {
+            return res.status(400).json({
+                error: 'Message content must be 2000 characters or less',
             });
         }
 

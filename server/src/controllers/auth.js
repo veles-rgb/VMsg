@@ -34,16 +34,35 @@ async function createUser(req, res, next) {
     try {
         const { username, displayName, password } = req.body;
 
-        if (!username || !displayName || !password) {
+        const trimmedUsername = username?.trim();
+        const trimmedDisplayName = displayName?.trim();
+
+        if (!trimmedUsername || !trimmedDisplayName || !password) {
             return res.status(400).json({ error: "username, displayName, and password are required" });
+        }
+
+        if (trimmedUsername.length < 3) {
+            return res.status(400).json({ error: 'Username must be at least 3 characters long' });
+        }
+
+        if (trimmedUsername.length > 25) {
+            return res.status(400).json({ error: 'Username must be 25 characters or less' });
+        }
+
+        if (trimmedDisplayName.length < 2) {
+            return res.status(400).json({ error: 'Display name must be at least 2 characters long' });
+        }
+
+        if (trimmedDisplayName.length > 25) {
+            return res.status(400).json({ error: 'Display name must be 25 characters or less' });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const user = await prisma.user.create({
             data: {
-                username,
-                displayName,
+                username: trimmedUsername,
+                displayName: trimmedDisplayName,
                 hashedPassword,
             },
             select: { id: true, username: true, displayName: true, createdAt: true },
