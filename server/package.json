@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "main": "src/app.js",
-  "scripts": {},
+  "scripts": {
+    "start": "node src/app.js",
+    "postinstall": "prisma generate --schema=prisma/schema.prisma",
+    "migrate:deploy": "prisma migrate deploy --schema=prisma/schema.prisma",
+    "start:prod": "npm run migrate:deploy && npm run start"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
