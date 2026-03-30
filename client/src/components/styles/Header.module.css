@@ -53,6 +53,11 @@
     color: var(--color-text-secondary);
 }
 
+.sectionTitle:hover {
+    cursor: pointer;
+    text-decoration: underline;
+}
+
 .iconButton {
     border: none;
     background: transparent;
