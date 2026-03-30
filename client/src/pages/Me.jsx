@@ -5,6 +5,8 @@ import { useEffect, useState } from 'react';
 
 const DEFAULT_AVATAR =
   'https://simplyilm.com/wp-content/uploads/2017/08/temporary-profile-placeholder-1.jpg';
+const DISPLAY_NAME_MIN_LENGTH = 2;
+const DISPLAY_NAME_MAX_LENGTH = 25;
 
 export default function Me() {
   const { user, token, updateUser } = useAuth();
@@ -120,6 +122,16 @@ export default function Me() {
 
     if (!trimmedDisplayName) {
       setDisplayNameError('Display name is required');
+      return;
+    }
+
+    if (
+      trimmedDisplayName.length < DISPLAY_NAME_MIN_LENGTH ||
+      trimmedDisplayName.length > DISPLAY_NAME_MAX_LENGTH
+    ) {
+      setDisplayNameError(
+        `Display name must be between ${DISPLAY_NAME_MIN_LENGTH} and ${DISPLAY_NAME_MAX_LENGTH} characters`,
+      );
       return;
     }
 
@@ -257,7 +269,8 @@ export default function Me() {
                 type="text"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                maxLength={25}
+                minLength={DISPLAY_NAME_MIN_LENGTH}
+                maxLength={DISPLAY_NAME_MAX_LENGTH}
               />
 
               {displayNameError && (

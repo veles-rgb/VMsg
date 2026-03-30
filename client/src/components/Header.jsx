@@ -22,6 +22,8 @@ function getAvatarSrc(profilePictureUrl) {
   return profilePictureUrl || DEFAULT_AVATAR;
 }
 
+const CHAT_TITLE_MAX_LENGTH = 100;
+
 function getLastActivityValue(chat) {
   return (
     chat.lastMessageAt ||
@@ -225,7 +227,21 @@ export default function Header() {
   async function handleRenameSubmit(e) {
     e.preventDefault();
 
-    if (!selectedChat?.id || !newTitle.trim() || renameLoading) return;
+    const trimmedNewTitle = newTitle.trim();
+
+    if (!selectedChat?.id || renameLoading) return;
+
+    if (!trimmedNewTitle) {
+      setRenameError('Chat title is required');
+      return;
+    }
+
+    if (trimmedNewTitle.length > CHAT_TITLE_MAX_LENGTH) {
+      setRenameError(
+        `Chat title must be ${CHAT_TITLE_MAX_LENGTH} characters or less`,
+      );
+      return;
+    }
 
     try {
       setRenameLoading(true);
@@ -238,7 +254,7 @@ export default function Header() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          newTitle: newTitle.trim(),
+          newTitle: trimmedNewTitle,
         }),
       });
 
@@ -255,7 +271,7 @@ export default function Header() {
           chat.id === selectedChat.id
             ? {
                 ...chat,
-                title: newTitle.trim(),
+                title: trimmedNewTitle,
               }
             : chat,
         ),
@@ -578,6 +594,7 @@ export default function Header() {
                 type="text"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
+                maxLength={CHAT_TITLE_MAX_LENGTH}
                 placeholder="Enter a new chat name"
               />
             </label>

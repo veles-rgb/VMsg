@@ -11,6 +11,8 @@ function getAvatarSrc(profilePictureUrl) {
   return profilePictureUrl || DEFAULT_AVATAR;
 }
 
+const CHAT_TITLE_MAX_LENGTH = 100;
+
 export default function CreateChat() {
   const { type } = useParams();
   const navigate = useNavigate();
@@ -127,8 +129,16 @@ export default function CreateChat() {
       setCreateLoading(true);
       setCreateError('');
 
-      if (!groupTitle.trim()) {
+      const trimmedGroupTitle = groupTitle.trim();
+
+      if (!trimmedGroupTitle) {
         throw new Error('Group title is required');
+      }
+
+      if (trimmedGroupTitle.length > CHAT_TITLE_MAX_LENGTH) {
+        throw new Error(
+          `Group title must be ${CHAT_TITLE_MAX_LENGTH} characters or less`,
+        );
       }
 
       if (selectedUsers.length === 0) {
@@ -142,7 +152,7 @@ export default function CreateChat() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          title: groupTitle.trim(),
+          title: trimmedGroupTitle,
           participants: selectedUsers.map((user) => user.id),
         }),
       });
@@ -224,6 +234,7 @@ export default function CreateChat() {
                   type="text"
                   value={groupTitle}
                   onChange={(e) => setGroupTitle(e.target.value)}
+                  maxLength={CHAT_TITLE_MAX_LENGTH}
                   placeholder="Enter group name"
                 />
               </label>

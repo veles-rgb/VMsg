@@ -16,6 +16,8 @@ import { FaEdit, FaRegWindowClose, FaUsers } from 'react-icons/fa';
 
 const DEFAULT_AVATAR =
   'https://simplyilm.com/wp-content/uploads/2017/08/temporary-profile-placeholder-1.jpg';
+const MESSAGE_MAX_LENGTH = 2000;
+const CHAT_TITLE_MAX_LENGTH = 100;
 
 function getAvatarSrc(profilePictureUrl) {
   return profilePictureUrl || DEFAULT_AVATAR;
@@ -428,7 +430,16 @@ export default function Chat() {
   }
 
   async function handleSend() {
-    if ((!message.trim() && !selectedAttachment) || sendingMessage) return;
+    const trimmedMessage = message.trim();
+
+    if ((!trimmedMessage && !selectedAttachment) || sendingMessage) return;
+
+    if (trimmedMessage.length > MESSAGE_MAX_LENGTH) {
+      setMessageError(
+        `Message content must be ${MESSAGE_MAX_LENGTH} characters or less`,
+      );
+      return;
+    }
 
     try {
       setSendingMessage(true);
@@ -443,7 +454,7 @@ export default function Chat() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          content: message.trim(),
+          content: trimmedMessage,
           attachmentUrl: uploadedAttachment?.url || null,
           attachmentPublicId: uploadedAttachment?.publicId || null,
           attachmentType: uploadedAttachment?.resourceType || null,
@@ -483,7 +494,21 @@ export default function Chat() {
   async function handleTitleFormSubmit(e) {
     e.preventDefault();
 
-    if (!newTitle.trim() || newTitleLoading) return;
+    const trimmedNewTitle = newTitle.trim();
+
+    if (newTitleLoading) return;
+
+    if (!trimmedNewTitle) {
+      setNewTitleError('Chat title is required');
+      return;
+    }
+
+    if (trimmedNewTitle.length > CHAT_TITLE_MAX_LENGTH) {
+      setNewTitleError(
+        `Chat title must be ${CHAT_TITLE_MAX_LENGTH} characters or less`,
+      );
+      return;
+    }
 
     try {
       setNewTitleLoading(true);
@@ -496,7 +521,7 @@ export default function Chat() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          newTitle: newTitle.trim(),
+          newTitle: trimmedNewTitle,
         }),
       });
 
@@ -512,7 +537,7 @@ export default function Chat() {
         prev
           ? {
               ...prev,
-              title: newTitle.trim(),
+              title: trimmedNewTitle,
             }
           : prev,
       );
@@ -1027,6 +1052,7 @@ export default function Chat() {
                 id="title"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
+                maxLength={CHAT_TITLE_MAX_LENGTH}
               />
             </label>
 
@@ -1144,7 +1170,6 @@ export default function Chat() {
 
             <textarea
               ref={textareaRef}
-              rows={1}
               className={styles.textarea}
               value={message}
               onChange={(e) => {
@@ -1152,8 +1177,13 @@ export default function Chat() {
                 setMessage(nextValue);
                 handleTextareaResize(e.target);
                 handleMentionLogic(nextValue, e.target.selectionStart);
+
+                if (messageError) {
+                  setMessageError('');
+                }
               }}
               placeholder="Type a message..."
+              maxLength={MESSAGE_MAX_LENGTH}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
