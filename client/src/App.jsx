@@ -13,6 +13,7 @@ import Chat from './pages/Chat.jsx';
 import CreateChat from './pages/CreateChat.jsx';
 import Me from './pages/Me.jsx';
 import Profile from './pages/Profile.jsx';
+import Chats from './pages/Chats.jsx';
 
 function App() {
   const { user, token, logout, verify, authLoading } = useAuth();
@@ -54,6 +55,7 @@ function App() {
             <Route path="/chat/new/:type" element={<CreateChat />} />
             <Route path="/me" element={<Me />} />
             <Route path="/user/:username" element={<Profile />} />
+            <Route path="/chats" element={<Chats />} />
           </>
         )}
 
